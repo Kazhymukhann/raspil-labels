@@ -181,16 +181,15 @@ def qr_text(part, disp_name):
     if not dk and not shk and not t:
         krom = "Кромка: нет"
     else:
-        krom = "Кромка: длина %d, ширина %d" % (dk, shk) + (", толщ. %s" % t if t else "")
+        krom = "Кромка: Д%d/Ш%d" % (dk, shk) + (", %s" % t if t else "")
     return "\n".join([
         disp_name,
-        "Дата: %s" % (part.get("date") or "—"),
-        "Кол-во: %s шт" % (part.get("qty") or "—"),
-        "Материал: %s" % mat,
+        "%s · %sшт" % (part.get("date") or "—", part.get("qty") or "—"),
+        mat,
         "Место: %s" % (part["cell"] or "—"),
-        "Размер: %s x %s" % (part["length"] or "—", part["width"] or "—"),
+        "%sx%s" % (part["length"] or "—", part["width"] or "—"),
         krom,
-        "CNC: %s" % ("есть" if part["prisadka"] else "нет"),
+        "CNC: %s" % ("да" if part["prisadka"] else "нет"),
     ])
 
 

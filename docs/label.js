@@ -46,16 +46,15 @@ function qrText(part, dispName) {
   const dk = numOr0(part.dk), shk = numOr0(part.shk);
   const t = String(part.tolk == null ? "" : part.tolk).trim();
   const krom = (!dk && !shk && !t) ? "Кромка: нет"
-    : "Кромка: длина " + dk + ", ширина " + shk + (t ? ", толщ. " + t : "");
+    : "Кромка: Д" + dk + "/Ш" + shk + (t ? ", " + t : "");
   return [
     dispName,
-    "Дата: " + padDate(part.date),
-    "Кол-во: " + (part.qty || "—") + " шт",
-    "Материал: " + mat,
+    padDate(part.date) + " · " + (part.qty || "—") + "шт",
+    mat,
     "Место: " + (part.cell || "—"),
-    "Размер: " + (part.length || "—") + " x " + (part.width || "—"),
+    (part.length || "—") + "x" + (part.width || "—"),
     krom,
-    "CNC: " + (part.prisadka ? "есть" : "нет"),
+    "CNC: " + (part.prisadka ? "да" : "нет"),
   ].join("\n");
 }
 
