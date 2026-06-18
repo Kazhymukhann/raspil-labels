@@ -9,3 +9,6 @@ labels/*.emf
 .DS_Store
 __pycache__/
 *.pyc
+
+# локальный конфиг с ID таблицы (не публиковать)
+config.json

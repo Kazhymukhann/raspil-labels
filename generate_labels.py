@@ -24,15 +24,30 @@
 Данные: РАСПИЛ -> какие детали, сколько штук, дата;  BASE -> материал, МЕСТО, размеры, CNC.
 """
 
-import sys, os, csv, io, urllib.request, urllib.parse
+import sys, os, csv, io, json, urllib.request, urllib.parse
 
 from PIL import Image, ImageDraw, ImageFont
 
 # ---------------------------------------------------------------- настройки
-SHEET_ID = "10nsX_nmzfPB7IyHM7oSqlj8wrdBn-zfoaKiMDZSccKI"
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+def load_sheet_id():
+    """ID Google-таблицы. Берётся из env RASPIL_SHEET_ID или из config.json
+    (config.json не хранится в репозитории — впиши свой ID, см. config.example.json)."""
+    sid = os.environ.get("RASPIL_SHEET_ID")
+    if sid:
+        return sid.strip()
+    cfg = os.path.join(HERE, "config.json")
+    if os.path.exists(cfg):
+        try:
+            return (json.load(open(cfg, encoding="utf-8")).get("sheet_id") or "").strip()
+        except Exception:
+            pass
+    return ""
+
+SHEET_ID = load_sheet_id()
 BASE_SHEET = "BASE"
 RASPIL_SHEET = "РАСПИЛ"
-HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, "base_cache.csv")
 OUT_DIR = os.path.join(HERE, "labels")
 ICON_PRISADKA = os.path.join(HERE, "assets", "cnc_prisadka.png")
@@ -272,6 +287,11 @@ def main():
 
     def opt(flag):
         return args[args.index(flag) + 1] if flag in args else None
+
+    if not SHEET_ID and not offline:
+        print("  ! Не задан ID таблицы. Создай config.json (см. config.example.json)\n"
+              "    или задай: export RASPIL_SHEET_ID=<id>")
+        sys.exit(1)
 
     base = fetch_base(offline=offline)
     os.makedirs(OUT_DIR, exist_ok=True)
