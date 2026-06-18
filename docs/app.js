@@ -6,6 +6,12 @@ let BASE = {};          // имя детали -> поля
 let JOB = [];           // текущее задание [{name, qty, date}]
 let GENERATED = [];     // [{filename, bytes, part, png, card, search}]
 let QUERY = "";         // строка поиска (фильтр карточек)
+let ACTIVE_DATE = "";   // дата, по которой реально сформированы бирки
+
+function todayStr() {
+  const d = new Date();
+  return d.getDate() + "." + (d.getMonth() + 1) + "." + d.getFullYear();
+}
 
 // ----- утилиты -----
 function normDate(s) {
@@ -144,25 +150,36 @@ async function init() {
     const [baseRows, raspilRows] = await Promise.all([fetchSheet("base"), fetchSheet("raspil")]);
     BASE = buildBase(baseRows);
     RASPIL_ROWS = raspilRows;
-    const dates = allDates(raspilRows);
-    const sel = $("dateSelect");
-    sel.innerHTML = "";
-    for (const d of dates) {
-      const o = document.createElement("option");
-      o.value = d; o.textContent = padDate2(d); sel.appendChild(o);
-    }
-    setStatus(`Готово. Деталей в базе: ${Object.keys(BASE).length}. Выбери дату и нажми «Сформировать».`, "ok");
     $("genBtn").disabled = false;
+    await generate();                      // сразу формируем задание на сегодня
   } catch (e) {
     setStatus("Ошибка: " + e.message + ". Проверь config.js (источник данных).", "err");
   }
 }
 
+async function refresh() {                 // «Обновить»: перечитать таблицу и пересобрать
+  setStatus("Обновляю данные из таблицы…");
+  try {
+    const [b, r] = await Promise.all([fetchSheet("base"), fetchSheet("raspil")]);
+    BASE = buildBase(b); RASPIL_ROWS = r;
+  } catch (e) { setStatus("Ошибка обновления: " + e.message, "err"); return; }
+  await generate();
+}
+
 // ----- поток: генерация -----
 async function generate() {
-  const date = $("dateSelect").value;
+  const today = todayStr();
+  let date = today, fellBack = false;
   JOB = parseJob(RASPIL_ROWS, date);
-  if (!JOB.length) { setStatus("За эту дату в РАСПИЛ ничего не найдено.", "err"); return; }
+  if (!JOB.length) {                       // на сегодня нет — берём последнюю дату
+    const dates = allDates(RASPIL_ROWS);
+    if (dates.length) { date = dates[0]; JOB = parseJob(RASPIL_ROWS, date); fellBack = true; }
+  }
+  ACTIVE_DATE = date;
+  $("hint").textContent = fellBack
+    ? `На сегодня (${padDate2(today)}) задания нет. Показано последнее: ${padDate2(date)}.`
+    : `Задание на сегодня: ${padDate2(date)}`;
+  if (!JOB.length) { setStatus("Заданий в таблице не найдено.", "err"); $("searchbar").hidden = true; return; }
   setStatus(`Формирую бирки (${JOB.length})…`);
   const grid = $("grid"); grid.innerHTML = ""; GENERATED = [];
   let n = 0, skipped = [];
@@ -238,7 +255,7 @@ async function downloadZip() {
   const blob = await zip.generateAsync({ type: "blob" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "labels_" + padDate2($("dateSelect").value).replace(/\./g, "-") + ".zip";
+  a.download = "labels_" + padDate2(ACTIVE_DATE).replace(/\./g, "-") + ".zip";
   a.click();
   setStatus(`Скачано ${list.length} бирок (ZIP).`, "ok");
 }
@@ -268,10 +285,10 @@ function enableExport(on) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  $("genBtn").addEventListener("click", generate);
+  $("genBtn").addEventListener("click", refresh);
   $("zipBtn").addEventListener("click", downloadZip);
   $("pdfBtn").addEventListener("click", () =>
-    downloadAllPdf("labels_" + padDate2($("dateSelect").value).replace(/\./g, "-") + ".pdf"));
+    downloadAllPdf("labels_" + padDate2(ACTIVE_DATE).replace(/\./g, "-") + ".pdf"));
   $("printBtn").addEventListener("click", () => printLabels(visibleGenerated()));
   $("search").addEventListener("input", applyFilter);
   init();

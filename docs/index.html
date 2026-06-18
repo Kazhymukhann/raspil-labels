@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Бирки — Пильный центр</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
   <header>
@@ -24,13 +24,9 @@
 
   <main>
     <div class="panel">
-      <p class="hint">Выбери дату задания и нажми «Сформировать бирки» — данные подтянутся из таблицы автоматически.</p>
-      <div class="row">
-        <label for="dateSelect">Дата задания</label>
-        <select id="dateSelect"><option>загрузка…</option></select>
-      </div>
+      <p class="hint" id="hint">Загружаю задание на сегодня…</p>
       <div class="row buttons">
-        <button id="genBtn" class="primary" disabled>Сформировать бирки</button>
+        <button id="genBtn" class="primary" disabled>↻ Обновить</button>
         <button id="printBtn" disabled>🖨 Печать всех</button>
         <button id="pdfBtn" disabled>📄 Скачать всё (PDF)</button>
         <button id="zipBtn" disabled>⬇ Скачать всё (EMF, ZIP)</button>
@@ -55,10 +51,10 @@
   <script src="vendor/qrcode.min.js"></script>
   <script src="vendor/jszip.min.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
-  <script src="icon.js"></script>
-  <script src="config.js"></script>
-  <script src="label.js"></script>
-  <script src="export.js"></script>
-  <script src="app.js"></script>
+  <script src="icon.js?v=2"></script>
+  <script src="config.js?v=2"></script>
+  <script src="label.js?v=2"></script>
+  <script src="export.js?v=2"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
