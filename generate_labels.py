@@ -118,10 +118,9 @@ def fetch_csv(sheet, cache_name):
 
 
 def parse_job(date_filter=None, offline=False):
-    """Читает вкладку РАСПИЛ и собирает задание из колонок Д1/Д2/Д3.
+    """Читает вкладку РАСПИЛ: Наименование (B) + кол-во (C) + Дата (A).
 
-    Формат ячейки Д: "Имя-Nшт | ЯЧЕЙКА".  Возвращает список словарей
-    {name, qty, date} в порядке появления (количество суммируется по детали+дате).
+    Возвращает список {name, qty, date}; количество суммируется по детали за день.
     """
     import re
     if offline:
@@ -137,39 +136,30 @@ def parse_job(date_filter=None, offline=False):
             x.strip().isdigit() for x in p) else s
 
     header = rows[0]
-    idx = {n: i for i, n in enumerate(header)}
-    date_i = idx.get("Дата", 0)
-    d_cols = [idx[c] for c in ("Д1", "Д2", "Д3") if c in idx]
-    pat = re.compile(r"^(?P<name>.+?)-(?P<qty>\d+)\s*шт\s*\|", re.U)
+    date_i = header.index("Дата") if "Дата" in header else 0           # A
+    name_i = header.index("Наименование") if "Наименование" in header else 1  # B
+    qty_i = header.index("кол-во") if "кол-во" in header else 2         # C
     want = norm_date(date_filter) if date_filter and date_filter != "all" else None
 
     order, acc = [], {}
     for r in rows[1:]:
-        if not r or len(r) <= date_i:
+        if not r or len(r) <= name_i:
             continue
-        rdate = r[date_i].strip()
+        rdate = r[date_i].strip() if date_i < len(r) else ""
         if not rdate:
             continue
         if want and norm_date(rdate) != want:
             continue
-        for ci in d_cols:
-            if ci >= len(r):
-                continue
-            cell = r[ci].strip()
-            if not cell or cell in ("X", "#N/A"):
-                continue
-            m = pat.match(cell)
-            if not m:
-                continue
-            name = m.group("name").strip()
-            qty = int(m.group("qty"))
-            if qty == 0:
-                continue
-            key = (name, rdate)
-            if key not in acc:
-                acc[key] = {"name": name, "qty": 0, "date": rdate}
-                order.append(key)
-            acc[key]["qty"] += qty
+        name = r[name_i].strip()
+        if not name:
+            continue
+        digits = re.sub(r"[^\d]", "", r[qty_i]) if qty_i < len(r) else ""
+        qty = int(digits) if digits else 0
+        key = (name, rdate)
+        if key not in acc:
+            acc[key] = {"name": name, "qty": 0, "date": rdate}
+            order.append(key)
+        acc[key]["qty"] += qty
     return [acc[k] for k in order]
 
 # ---------------------------------------------------------------- QR

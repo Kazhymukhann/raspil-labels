@@ -101,33 +101,28 @@ function buildBase(rows) {
 }
 
 function parseJob(rows, dateFilter) {
-  const h = rows[0], idx = {}; h.forEach((n, i) => idx[(n || "").trim()] = i);
-  const dateI = idx["Дата"] != null ? idx["Дата"] : 0;
-  const dCols = ["Д1", "Д2", "Д3"].filter((c) => idx[c] != null).map((c) => idx[c]);
+  const h = rows[0];
+  const dateI = Math.max(0, h.indexOf("Дата"));            // колонка A
+  const nameI = h.indexOf("Наименование") >= 0 ? h.indexOf("Наименование") : 1; // B
+  const qtyI = h.indexOf("кол-во") >= 0 ? h.indexOf("кол-во") : 2;              // C
   const want = dateFilter && dateFilter !== "all" ? normDate(dateFilter) : null;
-  const pat = /^(.+?)-(\d+)\s*шт\s*\|/;
   const order = [], acc = {};
   for (let k = 1; k < rows.length; k++) {
-    const r = rows[k]; if (!r || r.length <= dateI) continue;
+    const r = rows[k]; if (!r) continue;
     const rdate = (r[dateI] || "").trim(); if (!rdate) continue;
     if (want && normDate(rdate) !== want) continue;
-    for (const ci of dCols) {
-      const v = (r[ci] || "").trim();
-      if (!v || v === "X" || v === "#N/A") continue;
-      const m = v.match(pat); if (!m) continue;
-      const name = m[1].trim(), qty = parseInt(m[2], 10);
-      if (!qty) continue;
-      const key = name + "|" + rdate;
-      if (!(key in acc)) { acc[key] = { name, qty: 0, date: rdate }; order.push(key); }
-      acc[key].qty += qty;
-    }
+    const name = (r[nameI] || "").trim(); if (!name) continue;
+    const qty = parseInt(String(r[qtyI] || "").replace(/[^\d]/g, ""), 10) || 0;
+    const key = name + "|" + rdate;
+    if (!(key in acc)) { acc[key] = { name, qty: 0, date: rdate }; order.push(key); }
+    acc[key].qty += qty;                                   // суммируем, если деталь в нескольких строках за день
   }
   return order.map((k) => acc[k]);
 }
 
 function allDates(rows) {
-  const h = rows[0], idx = {}; h.forEach((n, i) => idx[(n || "").trim()] = i);
-  const dateI = idx["Дата"] != null ? idx["Дата"] : 0;
+  const h = rows[0];
+  const dateI = Math.max(0, h.indexOf("Дата"));            // колонка A
   const set = new Set();
   for (let k = 1; k < rows.length; k++) {
     const r = rows[k]; if (!r || r.length <= dateI) continue;
