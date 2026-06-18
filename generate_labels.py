@@ -173,6 +173,20 @@ def parse_job(date_filter=None, offline=False):
     return [acc[k] for k in order]
 
 # ---------------------------------------------------------------- QR
+def qr_text(part, disp_name):
+    """Текст для QR: все поля бирки (читается телефоном построчно)."""
+    mat = MATERIAL_DISPLAY.get(part["material"], part["material"] or "—")
+    return "\n".join([
+        disp_name,
+        "Дата: %s" % (part.get("date") or "—"),
+        "Кол-во: %s шт" % (part.get("qty") or "—"),
+        "Материал: %s" % mat,
+        "Место: %s" % (part["cell"] or "—"),
+        "Размер: %s x %s" % (part["length"] or "—", part["width"] or "—"),
+        "CNC: %s" % ("есть" if part["prisadka"] else "нет"),
+    ])
+
+
 def make_qr(text, box):
     """Чёткий сканируемый монохромный QR ~box пикселей (кратно модулю, без ресайза)."""
     import segno
@@ -209,8 +223,7 @@ def draw_label(part):
     # QR (кодируем отображаемое имя: "/" -> "-")
     disp_name = part["name"].replace("/", "-")
     qr_box = 540
-    # как в оригинале: хвостовой U+2800 уплотняет QR -> надёжно сканируется
-    qr = make_qr(disp_name + "⠀", qr_box)
+    qr = make_qr(qr_text(part, disp_name), qr_box)   # в QR — все поля бирки
     qx = 44 + (qr_box - qr.width) // 2          # центрируем в области QR
     qy = 40 + (qr_box - qr.height) // 2
     img.paste(qr, (qx, qy))

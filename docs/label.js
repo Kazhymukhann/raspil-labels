@@ -40,8 +40,22 @@ function fitFont(ctx, text, weight, size, family, maxW) {
 }
 
 // Рисуем QR в квадрат box, центрируя в (x0,y0,boxArea)
+// Текст для QR: всё, что есть на бирке (читается телефоном построчно)
+function qrText(part, dispName) {
+  const mat = MATERIAL_DISPLAY[part.material] || part.material || "—";
+  return [
+    dispName,
+    "Дата: " + padDate(part.date),
+    "Кол-во: " + (part.qty || "—") + " шт",
+    "Материал: " + mat,
+    "Место: " + (part.cell || "—"),
+    "Размер: " + (part.length || "—") + " x " + (part.width || "—"),
+    "CNC: " + (part.prisadka ? "есть" : "нет"),
+  ].join("\n");
+}
+
 function drawQR(ctx, text, x0, y0, boxArea) {
-  const qr = qrcode(0, "H");          // высокая коррекция -> плотный, надёжный
+  const qr = qrcode(0, "M");          // данных больше -> средняя коррекция (баланс плотность/надёжность)
   qr.addData(utf8(text), "Byte");
   qr.make();
   const n = qr.getModuleCount();
@@ -77,7 +91,7 @@ function drawLabel(canvas, part) {
 
   // -------- левая часть --------
   const dispName = String(part.name || "").replace(/\//g, "-");
-  drawQR(ctx, dispName + "⠀", 44, 40, 540);   // хвостовой U+2800 как в оригинале
+  drawQR(ctx, qrText(part, dispName), 44, 40, 540);   // в QR — все поля бирки
   line(ctx, 44, 612, 590, 612, 3);
 
   const dims = `${part.length || "—"}  x  ${part.width || "—"}`;
