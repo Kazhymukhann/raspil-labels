@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Бирки — Пильный центр</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🏷️ Бирки для пильного центра</h1>
+    <p>Выбери дату задания и нажми кнопку — бирки соберутся из таблицы автоматически.</p>
+  </header>
+
+  <main>
+    <div class="panel">
+      <div class="row">
+        <label for="dateSelect">Дата задания</label>
+        <select id="dateSelect"><option>загрузка…</option></select>
+      </div>
+      <div class="row buttons">
+        <button id="genBtn" class="primary" disabled>Сформировать бирки</button>
+        <button id="zipBtn" disabled>⬇ Скачать всё (ZIP)</button>
+      </div>
+      <div id="status" class="status">Запуск…</div>
+    </div>
+
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <footer>
+    Бирки печатаются на пильном центре. Данные тянутся из общей таблицы —
+    поменял «Место» в таблице, перегенерировал здесь, и на бирке новая ячейка.
+  </footer>
+
+  <script src="vendor/qrcode.min.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="icon.js"></script>
+  <script src="config.js"></script>
+  <script src="label.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

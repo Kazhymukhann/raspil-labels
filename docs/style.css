@@ -1,0 +1,60 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #f3f5f8; color: #1c2430;
+}
+header {
+  background: linear-gradient(135deg, #2f6df6, #1a47b8);
+  color: #fff; padding: 28px 20px 22px;
+}
+header h1 { margin: 0 0 6px; font-size: 26px; }
+header p { margin: 0; opacity: .9; font-size: 15px; }
+
+main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+.panel {
+  background: #fff; border-radius: 14px; padding: 20px;
+  box-shadow: 0 2px 10px rgba(20,40,80,.07); margin-bottom: 22px;
+}
+.row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.row label { font-weight: 600; min-width: 120px; }
+select {
+  font-size: 17px; padding: 10px 14px; border: 1.5px solid #cdd6e4;
+  border-radius: 10px; background: #fff; min-width: 200px;
+}
+.buttons { margin-bottom: 4px; }
+button {
+  font-size: 16px; font-weight: 600; padding: 12px 20px; border: 0;
+  border-radius: 10px; cursor: pointer; background: #e6ecf6; color: #1c2430;
+}
+button.primary { background: #2f6df6; color: #fff; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button:not(:disabled):hover { filter: brightness(1.05); }
+
+.status {
+  font-size: 15px; padding: 10px 0 0; color: #5a6678;
+}
+.status.ok { color: #137a3e; }
+.status.err { color: #c0341d; }
+
+.grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;
+}
+.card {
+  background: #fff; border-radius: 12px; padding: 12px;
+  box-shadow: 0 2px 8px rgba(20,40,80,.06); display: flex; flex-direction: column; gap: 8px;
+}
+.card canvas { width: 100%; height: auto; border: 1px solid #e4e9f1; border-radius: 8px; }
+.card .info { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.card .info b { font-size: 15px; }
+.card .info span { color: #5a6678; }
+.card .dl {
+  text-align: center; text-decoration: none; font-size: 14px; font-weight: 600;
+  color: #2f6df6; border: 1.5px solid #2f6df6; border-radius: 8px; padding: 8px;
+}
+.card .dl:hover { background: #2f6df6; color: #fff; }
+
+footer {
+  max-width: 1100px; margin: 0 auto; padding: 16px 20px 40px;
+  color: #8a94a6; font-size: 13px; line-height: 1.5;
+}
