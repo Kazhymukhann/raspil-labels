@@ -1,0 +1,319 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Генератор бирок для пильного центра.
+
+Что делает:
+  - тянет данные детали из базы (Google Sheet, вкладка BASE) по названию;
+  - берёт ДИНАМИЧЕСКУЮ ячейку из колонки «Место» (A3, B6, E3, X ...);
+  - рисует бирку 1:1 с оригиналом (QR + название + №ячейки + материал + размеры + CNC);
+  - сохраняет в формате labelN.emf (две копии монохромного BMP 1419x884, как у станка).
+
+Меняешь «Место» в таблице -> перегенерировал -> на бирке новая ячейка.
+
+Использование:
+  # ПОЛНАЯ ДИНАМИКА ИЗ ТАБЛИЦЫ (вкладка РАСПИЛ): сам соберёт все бирки задания
+  python3 generate_labels.py --job 08.12.2025      # все детали за дату
+  python3 generate_labels.py --job all             # всё задание целиком
+
+  # Ручной режим
+  python3 generate_labels.py "ANT-Bok L/R;27"               # деталь;кол-во
+  python3 generate_labels.py --date 08.12.2025 "ANT-Bok L/R;27" "V-Bok L/R;36"
+  python3 generate_labels.py --offline --job 08.12.2025     # без интернета (из кэша)
+
+Данные: РАСПИЛ -> какие детали, сколько штук, дата;  BASE -> материал, МЕСТО, размеры, CNC.
+"""
+
+import sys, os, csv, io, urllib.request, urllib.parse
+
+from PIL import Image, ImageDraw, ImageFont
+
+# ---------------------------------------------------------------- настройки
+SHEET_ID = "10nsX_nmzfPB7IyHM7oSqlj8wrdBn-zfoaKiMDZSccKI"
+BASE_SHEET = "BASE"
+RASPIL_SHEET = "РАСПИЛ"
+HERE = os.path.dirname(os.path.abspath(__file__))
+CACHE = os.path.join(HERE, "base_cache.csv")
+OUT_DIR = os.path.join(HERE, "labels")
+ICON_PRISADKA = os.path.join(HERE, "assets", "cnc_prisadka.png")
+
+# Канва бирки (как в оригинале со станка)
+W, H = 1419, 884
+
+# Короткие названия материалов для бирки (DB -> бирка). Дополняй по мере надобности.
+MATERIAL_DISPLAY = {
+    "ЛДСП Белый Молет": "ЛДСП «Белый»",
+    "ЛДСП Бежевый":     "ЛДСП «Бежевый»",
+    "ЛДСП Серый":       "ЛДСП «Серый»",
+    "ЛДСП Белый":       "ЛДСП «Белый»",
+}
+
+FONTS = "/System/Library/Fonts/Supplemental/"
+def font(name, size):
+    return ImageFont.truetype(FONTS + name, size)
+
+# ---------------------------------------------------------------- база (DB)
+def fetch_base(offline=False):
+    """Возвращает dict: имя детали -> словарь полей из BASE."""
+    if offline and os.path.exists(CACHE):
+        text = open(CACHE, encoding="utf-8").read()
+    else:
+        url = ("https://docs.google.com/spreadsheets/d/%s/gviz/tq"
+               "?tqx=out:csv&sheet=%s" % (SHEET_ID, urllib.parse.quote(BASE_SHEET)))
+        text = urllib.request.urlopen(url, timeout=30).read().decode("utf-8")
+        open(CACHE, "w", encoding="utf-8").write(text)  # кэш на случай оффлайна
+
+    rows = list(csv.reader(io.StringIO(text)))
+    header = rows[0]
+    idx = {name: i for i, name in enumerate(header)}
+    def col(r, name):
+        i = idx.get(name)
+        return r[i].strip() if i is not None and i < len(r) else ""
+
+    base = {}
+    for r in rows[1:]:
+        if not r or not r[0].strip():
+            continue
+        name = r[0].strip()
+        base[name] = {
+            "name":     name,
+            "material": col(r, "Материал"),
+            "cell":     col(r, "Место"),       # <-- ДИНАМИЧЕСКАЯ ЯЧЕЙКА
+            "prisadka": col(r, "Присадка"),
+            "length":   col(r, "Длина"),
+            "width":    col(r, "Ширина"),
+            "thick":    col(r, "Толщина"),
+            "date":     "",                    # уровень задания (вход)
+            "qty":      "",                    # уровень задания (вход)
+        }
+    return base
+
+
+def fetch_csv(sheet, cache_name):
+    """Скачать вкладку как CSV (живьём по имени) + кэш."""
+    cache = os.path.join(HERE, cache_name)
+    try:
+        url = ("https://docs.google.com/spreadsheets/d/%s/gviz/tq"
+               "?tqx=out:csv&sheet=%s" % (SHEET_ID, urllib.parse.quote(sheet)))
+        text = urllib.request.urlopen(url, timeout=30).read().decode("utf-8")
+        open(cache, "w", encoding="utf-8").write(text)
+    except Exception:
+        text = open(cache, encoding="utf-8").read()
+    return list(csv.reader(io.StringIO(text)))
+
+
+def parse_job(date_filter=None, offline=False):
+    """Читает вкладку РАСПИЛ и собирает задание из колонок Д1/Д2/Д3.
+
+    Формат ячейки Д: "Имя-Nшт | ЯЧЕЙКА".  Возвращает список словарей
+    {name, qty, date} в порядке появления (количество суммируется по детали+дате).
+    """
+    import re
+    if offline:
+        rows = list(csv.reader(io.StringIO(open(os.path.join(HERE, "raspil_cache.csv"),
+                                                encoding="utf-8").read())))
+    else:
+        rows = fetch_csv(RASPIL_SHEET, "raspil_cache.csv")
+
+    def norm_date(s):                       # "08.12.2025"/"8.12.2025" -> "8.12.2025"
+        s = (s or "").strip()
+        p = re.split(r"[.\-/]", s)
+        return ".".join(str(int(x)) for x in p) if len(p) == 3 and all(
+            x.strip().isdigit() for x in p) else s
+
+    header = rows[0]
+    idx = {n: i for i, n in enumerate(header)}
+    date_i = idx.get("Дата", 0)
+    d_cols = [idx[c] for c in ("Д1", "Д2", "Д3") if c in idx]
+    pat = re.compile(r"^(?P<name>.+?)-(?P<qty>\d+)\s*шт\s*\|", re.U)
+    want = norm_date(date_filter) if date_filter and date_filter != "all" else None
+
+    order, acc = [], {}
+    for r in rows[1:]:
+        if not r or len(r) <= date_i:
+            continue
+        rdate = r[date_i].strip()
+        if not rdate:
+            continue
+        if want and norm_date(rdate) != want:
+            continue
+        for ci in d_cols:
+            if ci >= len(r):
+                continue
+            cell = r[ci].strip()
+            if not cell or cell in ("X", "#N/A"):
+                continue
+            m = pat.match(cell)
+            if not m:
+                continue
+            name = m.group("name").strip()
+            qty = int(m.group("qty"))
+            if qty == 0:
+                continue
+            key = (name, rdate)
+            if key not in acc:
+                acc[key] = {"name": name, "qty": 0, "date": rdate}
+                order.append(key)
+            acc[key]["qty"] += qty
+    return [acc[k] for k in order]
+
+# ---------------------------------------------------------------- QR
+def make_qr(text, box):
+    """Чёткий сканируемый монохромный QR ~box пикселей (кратно модулю, без ресайза)."""
+    import segno
+    qr = segno.make(text, error="m")
+    modules = qr.symbol_size(border=2)[0]          # модулей вместе с тихой зоной
+    scale = max(1, round(box / modules))           # целочисленный масштаб
+    buf = io.BytesIO()
+    qr.save(buf, kind="png", scale=scale, border=2)
+    buf.seek(0)
+    return Image.open(buf).convert("1")            # размер = modules*scale (≈ box)
+
+# ---------------------------------------------------------------- отрисовка
+def fit_font(draw, text, name, size, max_w):
+    """Подбираем размер шрифта, чтобы текст влез в max_w пикселей."""
+    f = font(name, size)
+    while size > 24 and draw.textlength(text, font=f) > max_w:
+        size -= 4
+        f = font(name, size)
+    return f
+
+def draw_label(part):
+    img = Image.new("1", (W, H), 1)            # 1-bit, белый фон
+    d = ImageDraw.Draw(img)
+    BLACK = 0
+
+    # --- внешняя рамка (скруглённый прямоугольник)
+    d.rounded_rectangle([6, 6, W - 7, H - 7], radius=26, outline=BLACK, width=4)
+
+    # --- вертикальный разделитель
+    DIV = 626
+    d.line([(DIV, 40), (DIV, H - 40)], fill=BLACK, width=4)
+
+    # ============================ ЛЕВАЯ ЧАСТЬ ============================
+    # QR (кодируем отображаемое имя: "/" -> "-")
+    disp_name = part["name"].replace("/", "-")
+    qr_box = 540
+    # как в оригинале: хвостовой U+2800 уплотняет QR -> надёжно сканируется
+    qr = make_qr(disp_name + "⠀", qr_box)
+    qx = 44 + (qr_box - qr.width) // 2          # центрируем в области QR
+    qy = 40 + (qr_box - qr.height) // 2
+    img.paste(qr, (qx, qy))
+
+    # линия под QR
+    d.line([(44, 612), (590, 612)], fill=BLACK, width=3)
+
+    # размеры "Длина x Ширина"
+    dims = "%s  x  %s" % (part["length"] or "—", part["width"] or "—")
+    fdim = fit_font(d, dims, "Arial Black.ttf", 96, 540)
+    d.text((48, 648), dims, font=fdim, fill=BLACK)
+    # два коротких подчёркивания под размерами
+    d.line([(48, 800), (250, 800)], fill=BLACK, width=3)
+    d.line([(330, 800), (470, 800)], fill=BLACK, width=3)
+
+    # ============================ ПРАВАЯ ЧАСТЬ ===========================
+    RX = 660                                    # левый край правой колонки
+    RXE = W - 44                                # правый край
+    RW = RXE - RX
+
+    # 1) Наименование по системе
+    ftitle = fit_font(d, disp_name, "Arial Bold.ttf", 76, RW)
+    d.text((RX, 48), disp_name, font=ftitle, fill=BLACK)
+
+    # 2) Дата  |  Кол-во в партии
+    flab = font("Arial Bold.ttf", 44)
+    dt = part.get("date") or ""
+    p = dt.split(".")
+    if len(p) == 3 and all(x.isdigit() for x in p):     # дополняем до dd.mm.yyyy
+        dt = "%02d.%02d.%s" % (int(p[0]), int(p[1]), p[2])
+    d.text((RX, 188), "Дата: %s" % (dt or "—"), font=flab, fill=BLACK)
+    d.text((RX, 252), "Кол-во в партии: %s шт" % (part.get("qty") or "—"),
+           font=flab, fill=BLACK)
+
+    # 3) Материал
+    mat = MATERIAL_DISPLAY.get(part["material"], part["material"] or "—")
+    fmat = fit_font(d, "Материал: " + mat, "Arial Bold.ttf", 46, RW)
+    d.text((RX, 326), "Материал: " + mat, font=fmat, fill=BLACK)
+
+    # разделительная линия
+    d.line([(RX, 420), (RXE, 420)], fill=BLACK, width=3)
+
+    # 4) МЕСТО (ячейка) — ключевое динамическое поле, крупно
+    flab2 = font("Arial Bold.ttf", 60)
+    d.text((RX, 470), "Место:", font=flab2, fill=BLACK)
+    fcell = font("Arial Black.ttf", 104)
+    lab_w = d.textlength("Место:", font=flab2)
+    d.text((RX + lab_w + 28, 438), part["cell"] or "—", font=fcell, fill=BLACK)
+
+    # 5) CNC: + иконка операции (присадка) — снизу справа
+    fcnc = font("Arial Bold.ttf", 60)
+    d.text((RX, 690), "CNC:", font=fcnc, fill=BLACK)
+    if part["prisadka"] and os.path.exists(ICON_PRISADKA):
+        icon = Image.open(ICON_PRISADKA).convert("1")
+        img.paste(icon, (RX + 200, 640))
+
+    return img
+
+# ------------------------------------------------------- сохранение в .emf
+def save_emf(img, path):
+    """Сохраняем как 1-bit BMP, продублированный дважды (формат файлов станка)."""
+    buf = io.BytesIO()
+    img.convert("1").save(buf, format="BMP")
+    bmp = buf.getvalue()
+    with open(path, "wb") as f:
+        f.write(bmp)
+        f.write(bmp)            # вторая копия — как в оригинальных файлах
+
+# ---------------------------------------------------------------- main
+def main():
+    import datetime
+    args = sys.argv[1:]
+    offline = "--offline" in args
+
+    def opt(flag):
+        return args[args.index(flag) + 1] if flag in args else None
+
+    base = fetch_base(offline=offline)
+    os.makedirs(OUT_DIR, exist_ok=True)
+
+    # ---- собираем список заданий: (name, qty, date) ----
+    jobs = []
+    if "--job" in args:
+        # ПОЛНАЯ ДИНАМИКА: тянем задание прямо из вкладки РАСПИЛ
+        for j in parse_job(date_filter=opt("--job"), offline=offline):
+            jobs.append((j["name"], str(j["qty"]), j["date"]))
+        if not jobs:
+            print("  ! За '%s' в РАСПИЛ ничего не найдено" % opt("--job"))
+            sys.exit(1)
+    else:
+        # ручной режим: "Имя" или "Имя;кол-во", дата через --date
+        job_date = opt("--date") or datetime.date.today().strftime("%d.%m.%Y")
+        skip = {args.index("--date") + 1} if "--date" in args else set()
+        items = [a for k, a in enumerate(args)
+                 if not a.startswith("--") and k not in skip]
+        if not items:
+            print(__doc__)
+            sys.exit(1)
+        for it in items:
+            name, qty = (it.rsplit(";", 1) + [""])[:2] if ";" in it else (it, "")
+            jobs.append((name.strip(), qty.strip(), job_date))
+
+    # ---- генерим бирки ----
+    n = 0
+    for name, qty, date in jobs:
+        part = base.get(name)
+        if part is None:
+            print("  ! НЕ найдено в BASE: %r — пропуск" % name)
+            continue
+        n += 1
+        part = dict(part, date=date, qty=qty)
+        img = draw_label(part)
+        out = os.path.join(OUT_DIR, "label%d.emf" % n)
+        save_emf(img, out)
+        print("  label%d.emf  <-  %s | Место: %s | %s шт | %s | %s | %sx%s"
+              % (n, part["name"], part["cell"] or "—", part["qty"] or "—",
+                 part["date"], part["material"], part["length"], part["width"]))
+    print("  ИТОГО бирок: %d  ->  %s" % (n, OUT_DIR))
+
+if __name__ == "__main__":
+    main()
