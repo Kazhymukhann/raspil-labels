@@ -43,6 +43,10 @@ function fitFont(ctx, text, weight, size, family, maxW) {
 // Текст для QR: всё, что есть на бирке (читается телефоном построчно)
 function qrText(part, dispName) {
   const mat = MATERIAL_DISPLAY[part.material] || part.material || "—";
+  const dk = numOr0(part.dk), shk = numOr0(part.shk);
+  const t = String(part.tolk == null ? "" : part.tolk).trim();
+  const krom = (!dk && !shk && !t) ? "Кромка: нет"
+    : "Кромка: длина " + dk + ", ширина " + shk + (t ? ", толщ. " + t : "");
   return [
     dispName,
     "Дата: " + padDate(part.date),
@@ -50,6 +54,7 @@ function qrText(part, dispName) {
     "Материал: " + mat,
     "Место: " + (part.cell || "—"),
     "Размер: " + (part.length || "—") + " x " + (part.width || "—"),
+    krom,
     "CNC: " + (part.prisadka ? "есть" : "нет"),
   ].join("\n");
 }

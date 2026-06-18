@@ -176,6 +176,12 @@ def parse_job(date_filter=None, offline=False):
 def qr_text(part, disp_name):
     """Текст для QR: все поля бирки (читается телефоном построчно)."""
     mat = MATERIAL_DISPLAY.get(part["material"], part["material"] or "—")
+    dk, shk = _num(part.get("dk")), _num(part.get("shk"))
+    t = str(part.get("tolk") if part.get("tolk") is not None else "").strip()
+    if not dk and not shk and not t:
+        krom = "Кромка: нет"
+    else:
+        krom = "Кромка: длина %d, ширина %d" % (dk, shk) + (", толщ. %s" % t if t else "")
     return "\n".join([
         disp_name,
         "Дата: %s" % (part.get("date") or "—"),
@@ -183,6 +189,7 @@ def qr_text(part, disp_name):
         "Материал: %s" % mat,
         "Место: %s" % (part["cell"] or "—"),
         "Размер: %s x %s" % (part["length"] or "—", part["width"] or "—"),
+        krom,
         "CNC: %s" % ("есть" if part["prisadka"] else "нет"),
     ])
 
