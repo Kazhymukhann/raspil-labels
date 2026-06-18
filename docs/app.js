@@ -172,35 +172,55 @@ async function generate() {
     const part = Object.assign({}, b, { date: j.date, qty: j.qty });
     const canvas = document.createElement("canvas");
     drawLabel(canvas, part);
-    const bytes = makeEMF(canvas);
-    const filename = `label${n}.emf`;
-    GENERATED.push({ filename, bytes, part });
-    grid.appendChild(makeCard(canvas, part, filename, bytes));
+    const g = {
+      filename: `label${n}.emf`,
+      bytes: makeEMF(canvas),
+      png: canvas.toDataURL("image/png"),   // для превью, PDF и печати
+      part,
+    };
+    GENERATED.push(g);
+    grid.appendChild(makeCard(g));
     if (n % 5 === 0) await new Promise((r) => setTimeout(r)); // не вешать UI
   }
-  $("zipBtn").disabled = GENERATED.length === 0;
-  let msg = `Готово: ${GENERATED.length} бирок.`;
+  enableExport(GENERATED.length > 0);
+  let msg = `Готово: ${GENERATED.length} бирок. Можно распечатать или скачать (PDF / EMF / ZIP).`;
   if (skipped.length) msg += ` Нет в базе BASE (пропущены): ${skipped.join(", ")}.`;
   setStatus(msg, GENERATED.length ? "ok" : "err");
 }
 
-function makeCard(canvas, part, filename, bytes) {
+function makeCard(g) {
+  const { part, filename, bytes, png } = g;
   const card = document.createElement("div"); card.className = "card";
-  const thumb = document.createElement("canvas");
-  thumb.width = 355; thumb.height = 221;
-  thumb.getContext("2d").drawImage(canvas, 0, 0, 355, 221);
-  card.appendChild(thumb);
+
+  const img = document.createElement("img"); img.className = "thumb"; img.src = png;
+  card.appendChild(img);
+
   const info = document.createElement("div"); info.className = "info";
   info.innerHTML = `<b>${esc(part.name)}</b>` +
     `<span>Место: <b>${esc(part.cell || "—")}</b> · ${esc(part.qty || "—")} шт</span>` +
     `<span>${esc(part.material || "")}</span>`;
   card.appendChild(info);
-  const a = document.createElement("a");
-  a.className = "dl"; a.textContent = "скачать " + filename;
-  a.href = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
-  a.download = filename;
-  card.appendChild(a);
+
+  const actions = document.createElement("div"); actions.className = "actions";
+  // печать
+  const aPr = btn("🖨 печать", () => printLabels([g]));
+  // PDF
+  const aPdf = btn("PDF", () => downloadPdf(g));
+  // EMF (для станка)
+  const aEmf = document.createElement("a");
+  aEmf.className = "dl"; aEmf.textContent = "EMF";
+  aEmf.href = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+  aEmf.download = filename;
+  actions.append(aPr, aPdf, aEmf);
+  card.appendChild(actions);
   return card;
+}
+
+function btn(text, onClick) {
+  const a = document.createElement("a");
+  a.className = "dl"; a.textContent = text; a.href = "#";
+  a.addEventListener("click", (e) => { e.preventDefault(); onClick(); });
+  return a;
 }
 
 async function downloadZip() {
@@ -218,8 +238,17 @@ async function downloadZip() {
 function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 function setStatus(t, cls) { const e = $("status"); e.textContent = t; e.className = "status " + (cls || ""); }
 
+function enableExport(on) {
+  $("zipBtn").disabled = !on;
+  $("pdfBtn").disabled = !on;
+  $("printBtn").disabled = !on;
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   $("genBtn").addEventListener("click", generate);
   $("zipBtn").addEventListener("click", downloadZip);
+  $("pdfBtn").addEventListener("click", () =>
+    downloadAllPdf("labels_" + padDate2($("dateSelect").value).replace(/\./g, "-") + ".pdf"));
+  $("printBtn").addEventListener("click", () => printLabels(GENERATED));
   init();
 });

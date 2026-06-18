@@ -44,13 +44,14 @@ button:not(:disabled):hover { filter: brightness(1.05); }
   background: #fff; border-radius: 12px; padding: 12px;
   box-shadow: 0 2px 8px rgba(20,40,80,.06); display: flex; flex-direction: column; gap: 8px;
 }
-.card canvas { width: 100%; height: auto; border: 1px solid #e4e9f1; border-radius: 8px; }
+.card img.thumb { width: 100%; height: auto; border: 1px solid #e4e9f1; border-radius: 8px; background:#fff; }
 .card .info { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
 .card .info b { font-size: 15px; }
 .card .info span { color: #5a6678; }
+.card .actions { display: flex; gap: 6px; }
 .card .dl {
-  text-align: center; text-decoration: none; font-size: 14px; font-weight: 600;
-  color: #2f6df6; border: 1.5px solid #2f6df6; border-radius: 8px; padding: 8px;
+  flex: 1; text-align: center; text-decoration: none; font-size: 13px; font-weight: 600;
+  color: #2f6df6; border: 1.5px solid #2f6df6; border-radius: 8px; padding: 8px 4px; cursor: pointer;
 }
 .card .dl:hover { background: #2f6df6; color: #fff; }
 
