@@ -84,6 +84,11 @@ def fetch_base(offline=False):
     def col(r, name):
         i = idx.get(name)
         return r[i].strip() if i is not None and i < len(r) else ""
+    def coln(r, name):                       # None, если колонки нет
+        i = idx.get(name)
+        if i is None:
+            return None
+        return r[i].strip() if i < len(r) else ""
 
     base = {}
     for r in rows[1:]:
@@ -98,6 +103,9 @@ def fetch_base(offline=False):
             "length":   col(r, "Длина"),
             "width":    col(r, "Ширина"),
             "thick":    col(r, "Толщина"),
+            "tolk":     coln(r, "ТолК"),       # толщина кромки (0.8 жирная / 0.4 тонкая)
+            "dk":       coln(r, "ДК"),         # длина-кромка: кол-во линий
+            "shk":      coln(r, "ШК"),         # ширина-кромка: кол-во линий
             "date":     "",                    # уровень задания (вход)
             "qty":      "",                    # уровень задания (вход)
         }
@@ -189,6 +197,24 @@ def make_qr(text, box):
     return Image.open(buf).convert("1")            # размер = modules*scale (≈ box)
 
 # ---------------------------------------------------------------- отрисовка
+def _num(v):
+    import re
+    s = re.sub(r"[^\d]", "", str(v if v is not None else ""))
+    return int(s) if s else 0
+
+def _thick(v):
+    try:
+        return float(str(v if v is not None else "").replace(",", ".")) >= 0.6
+    except ValueError:
+        return False
+
+def _edge(d, x1, x2, y_top, count, lw):
+    if not count or count < 1:
+        return
+    gap = lw + 8
+    for i in range(count):
+        d.line([(x1, y_top + i * gap), (x2, y_top + i * gap)], fill=0, width=lw)
+
 def fit_font(draw, text, name, size, max_w):
     """Подбираем размер шрифта, чтобы текст влез в max_w пикселей."""
     f = font(name, size)
@@ -221,13 +247,21 @@ def draw_label(part):
     # линия под QR
     d.line([(44, 612), (590, 612)], fill=BLACK, width=3)
 
-    # размеры "Длина x Ширина"
-    dims = "%s  x  %s" % (part["length"] or "—", part["width"] or "—")
+    # размеры "Длина x Ширина" + обозначение кромки под числами
+    len_str = str(part["length"] or "—"); wid_str = str(part["width"] or "—")
+    dims = "%s  x  %s" % (len_str, wid_str)
     fdim = fit_font(d, dims, "Arial Black.ttf", 96, 540)
     d.text((48, 648), dims, font=fdim, fill=BLACK)
-    # два коротких подчёркивания под размерами
-    d.line([(48, 800), (250, 800)], fill=BLACK, width=3)
-    d.line([(330, 800), (470, 800)], fill=BLACK, width=3)
+    x1b = 48 + d.textlength(len_str, font=fdim)
+    x2a = 48 + d.textlength("%s  x  " % len_str, font=fdim)
+    x2b = x2a + d.textlength(wid_str, font=fdim)
+    if part.get("dk") is None and part.get("shk") is None:   # колонок кромки нет — как раньше
+        d.line([(48, 800), (x1b, 800)], fill=BLACK, width=3)
+        d.line([(x2a, 800), (x2b, 800)], fill=BLACK, width=3)
+    else:
+        lw = 8 if _thick(part.get("tolk")) else 3
+        _edge(d, 48, x1b, 800, _num(part.get("dk")), lw)       # Длина → ДК
+        _edge(d, x2a, x2b, 800, _num(part.get("shk")), lw)     # Ширина → ШК
 
     # ============================ ПРАВАЯ ЧАСТЬ ===========================
     RX = 660                                    # левый край правой колонки

@@ -94,10 +94,21 @@ function drawLabel(canvas, part) {
   drawQR(ctx, qrText(part, dispName), 44, 40, 540);   // в QR — все поля бирки
   line(ctx, 44, 612, 590, 612, 3);
 
-  const dims = `${part.length || "—"}  x  ${part.width || "—"}`;
+  const lenStr = String(part.length || "—"), widStr = String(part.width || "—");
+  const dims = `${lenStr}  x  ${widStr}`;
   let s = fitFont(ctx, dims, "900", 96, FAM, 540);
   ctx.font = `900 ${s}px ${FAM}`; ctx.fillText(dims, 48, 648);
-  line(ctx, 48, 800, 250, 800, 3); line(ctx, 330, 800, 470, 800, 3);
+  // обозначение кромки под числами (Длина→ДК, Ширина→ШК), толщина по ТолК
+  const x1b = 48 + ctx.measureText(lenStr).width;
+  const x2a = 48 + ctx.measureText(`${lenStr}  x  `).width;
+  const x2b = x2a + ctx.measureText(widStr).width;
+  if (part.dk == null && part.shk == null) {        // колонок кромки нет — как раньше
+    line(ctx, 48, 800, x1b, 800, 3); line(ctx, x2a, 800, x2b, 800, 3);
+  } else {
+    const lw = isThick(part.tolk) ? 8 : 3;
+    edgeLines(ctx, 48, x1b, 800, numOr0(part.dk), lw);
+    edgeLines(ctx, x2a, x2b, 800, numOr0(part.shk), lw);
+  }
 
   // -------- правая часть --------
   const RX = 660, RXE = LBL_W - 44, RW = RXE - RX;
@@ -137,6 +148,15 @@ function line(ctx, x1, y1, x2, y2, w) {
   ctx.lineWidth = w; ctx.beginPath();
   ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
 }
+
+// Обозначение кромки: count параллельных линий, толщина по ТолК
+function edgeLines(ctx, x1, x2, yTop, count, lw) {
+  if (!count || count < 1) return;
+  const gap = lw + 8;
+  for (let i = 0; i < count; i++) line(ctx, x1, yTop + i * gap, x2, yTop + i * gap, lw);
+}
+function numOr0(v) { return parseInt(String(v == null ? "" : v).replace(/[^\d]/g, ""), 10) || 0; }
+function isThick(v) { return parseFloat(String(v == null ? "" : v).replace(",", ".")) >= 0.6; }
 
 // -------- кодирование canvas -> 1-bit BMP (формат станка) --------
 function encodeBMP1bit(canvas) {

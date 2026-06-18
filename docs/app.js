@@ -88,6 +88,7 @@ function gvizToRows(resp) {
 function buildBase(rows) {
   const h = rows[0], idx = {}; h.forEach((n, i) => idx[(n || "").trim()] = i);
   const col = (r, n) => { const i = idx[n]; return i != null && i < r.length ? (r[i] || "").trim() : ""; };
+  const colN = (r, n) => idx[n] == null ? null : (idx[n] < r.length ? (r[idx[n]] || "").trim() : "");
   const map = {};
   for (let k = 1; k < rows.length; k++) {
     const r = rows[k]; if (!r || !(r[0] || "").trim()) continue;
@@ -95,6 +96,7 @@ function buildBase(rows) {
     map[name] = {
       name, material: col(r, "Материал"), cell: col(r, "Место"),
       prisadka: col(r, "Присадка"), length: col(r, "Длина"), width: col(r, "Ширина"),
+      tolk: colN(r, "ТолК"), dk: colN(r, "ДК"), shk: colN(r, "ШК"),  // кромка (null = колонки нет)
     };
   }
   return map;
