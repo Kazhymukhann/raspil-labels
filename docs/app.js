@@ -48,30 +48,33 @@ function parseCSV(text) {
 }
 
 // ----- получение данных: опубликованный CSV или gviz JSONP -----
-async function fetchSheet(kind) {  // kind: 'base' | 'raspil'
+async function fetchSheet(kind) {  // kind: 'base' (детали) | 'raspil' (задание)
   const url = kind === "base" ? CFG.baseCsvUrl : CFG.raspilCsvUrl;
   if (url) {
-    const r = await fetch(url);
+    const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) throw new Error("Не удалось загрузить CSV (" + r.status + ")");
     return parseCSV(await r.text());
   }
-  if (CFG.sheetId) {
-    const sheet = kind === "base" ? CFG.baseSheet : CFG.raspilSheet;
-    return await gvizJSONP(CFG.sheetId, sheet);
+  if (kind === "base") {
+    return await gvizJSONP(CFG.baseSheetId, CFG.baseGid
+      ? { gid: CFG.baseGid } : { sheet: CFG.baseSheet || "Main" });
   }
-  throw new Error("Источник данных не настроен (config.js)");
+  return await gvizJSONP(CFG.raspilSheetId, { sheet: CFG.raspilSheet || "РАСПИЛ" });
 }
 
-function gvizJSONP(sheetId, sheet) {
+function gvizJSONP(sheetId, opts) {
   return new Promise((resolve, reject) => {
+    if (!sheetId) { reject(new Error("Не задан ID таблицы (config.js)")); return; }
     const cb = "gviz_cb_" + Math.floor(performance.now()) + "_" +
                Math.random().toString(36).slice(2);
     const s = document.createElement("script");
     const cleanup = () => { delete window[cb]; s.remove(); };
     window[cb] = (resp) => { cleanup(); resolve(gvizToRows(resp)); };
     s.onerror = () => { cleanup(); reject(new Error("Нет доступа к таблице (JSONP)")); };
+    const sel = opts.gid ? "gid=" + encodeURIComponent(opts.gid)
+                         : "sheet=" + encodeURIComponent(opts.sheet);
     s.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq` +
-            `?sheet=${encodeURIComponent(sheet)}&tqx=responseHandler:${cb}`;
+            `?${sel}&tqx=responseHandler:${cb}`;
     document.head.appendChild(s);
   });
 }

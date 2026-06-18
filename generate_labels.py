@@ -45,9 +45,11 @@ def load_sheet_id():
             pass
     return ""
 
-SHEET_ID = load_sheet_id()
-BASE_SHEET = "BASE"
+SHEET_ID = load_sheet_id()           # таблица с заданием (вкладка РАСПИЛ)
 RASPIL_SHEET = "РАСПИЛ"
+# Детали (материал/место/размеры/кромка) — таблица Details List, вкладка Main
+BASE_SHEET_ID = "1pWEjfyh_MOm1U0zPpNIyp9DkqTk6ICcxS4W-8YqzKuI"
+BASE_GID = "1918355371"
 CACHE = os.path.join(HERE, "base_cache.csv")
 OUT_DIR = os.path.join(HERE, "labels")
 ICON_PRISADKA = os.path.join(HERE, "assets", "cnc_prisadka.png")
@@ -74,7 +76,7 @@ def fetch_base(offline=False):
         text = open(CACHE, encoding="utf-8").read()
     else:
         url = ("https://docs.google.com/spreadsheets/d/%s/gviz/tq"
-               "?tqx=out:csv&sheet=%s" % (SHEET_ID, urllib.parse.quote(BASE_SHEET)))
+               "?tqx=out:csv&gid=%s" % (BASE_SHEET_ID, BASE_GID))
         text = urllib.request.urlopen(url, timeout=30).read().decode("utf-8")
         open(CACHE, "w", encoding="utf-8").write(text)  # кэш на случай оффлайна
 
