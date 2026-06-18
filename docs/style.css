@@ -48,6 +48,18 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .status.ok { color: var(--green-d); }
 .status.err { color: #c0341d; }
 
+.searchbar {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+  background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 4px 14px;
+  box-shadow: 0 1px 4px rgba(30,50,20,.05);
+}
+.searchbar i { font-style: normal; opacity: .6; }
+.searchbar input {
+  flex: 1; border: 0; outline: none; font-size: 16px; padding: 10px 0;
+  background: transparent; color: var(--text);
+}
+.searchbar .count { color: var(--muted); font-size: 14px; white-space: nowrap; }
+
 .grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;
 }

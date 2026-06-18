@@ -22,8 +22,9 @@ function downloadPdf(g) {
   pdfDoc([g]).save(g.filename.replace(/\.emf$/, ".pdf"));
 }
 function downloadAllPdf(name) {
-  if (!GENERATED.length) return;
-  pdfDoc(GENERATED).save(name || "labels.pdf");
+  const list = visibleGenerated();
+  if (!list.length) return;
+  pdfDoc(list).save(name || "labels.pdf");
 }
 
 // ---- печать прямо из браузера (без скачивания) ----

@@ -4,7 +4,8 @@ const $ = (id) => document.getElementById(id);
 
 let BASE = {};          // имя детали -> поля
 let JOB = [];           // текущее задание [{name, qty, date}]
-let GENERATED = [];     // [{filename, bytes, part, canvas}]
+let GENERATED = [];     // [{filename, bytes, part, png, card, search}]
+let QUERY = "";         // строка поиска (фильтр карточек)
 
 // ----- утилиты -----
 function normDate(s) {
@@ -183,6 +184,9 @@ async function generate() {
     if (n % 5 === 0) await new Promise((r) => setTimeout(r)); // не вешать UI
   }
   enableExport(GENERATED.length > 0);
+  const sb = $("searchbar");
+  sb.hidden = GENERATED.length === 0;
+  $("search").value = ""; QUERY = ""; applyFilter();
   let msg = `Готово: ${GENERATED.length} бирок. Можно распечатать или скачать (PDF / EMF / ZIP).`;
   if (skipped.length) msg += ` Нет в базе BASE (пропущены): ${skipped.join(", ")}.`;
   setStatus(msg, GENERATED.length ? "ok" : "err");
@@ -191,6 +195,8 @@ async function generate() {
 function makeCard(g) {
   const { part, filename, bytes, png } = g;
   const card = document.createElement("div"); card.className = "card";
+  g.card = card;
+  g.search = [part.name, part.cell, part.material].join(" ").toLowerCase();
 
   const img = document.createElement("img"); img.className = "thumb"; img.src = png;
   card.appendChild(img);
@@ -224,15 +230,32 @@ function btn(text, onClick) {
 }
 
 async function downloadZip() {
+  const list = visibleGenerated();
+  if (!list.length) return;
   setStatus("Упаковываю в ZIP…");
   const zip = new JSZip();
-  for (const g of GENERATED) zip.file(g.filename, g.bytes);
+  for (const g of list) zip.file(g.filename, g.bytes);
   const blob = await zip.generateAsync({ type: "blob" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "labels_" + padDate2($("dateSelect").value).replace(/\./g, "-") + ".zip";
   a.click();
-  setStatus(`Скачано ${GENERATED.length} бирок (ZIP).`, "ok");
+  setStatus(`Скачано ${list.length} бирок (ZIP).`, "ok");
+}
+
+function visibleGenerated() {
+  return QUERY ? GENERATED.filter((g) => g.search.includes(QUERY)) : GENERATED;
+}
+function applyFilter() {
+  QUERY = $("search").value.trim().toLowerCase();
+  let shown = 0;
+  for (const g of GENERATED) {
+    const ok = !QUERY || g.search.includes(QUERY);
+    g.card.style.display = ok ? "" : "none";
+    if (ok) shown++;
+  }
+  const c = $("count");
+  c.textContent = QUERY ? `показано ${shown} из ${GENERATED.length}` : `всего ${GENERATED.length}`;
 }
 
 function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
@@ -249,6 +272,7 @@ window.addEventListener("DOMContentLoaded", () => {
   $("zipBtn").addEventListener("click", downloadZip);
   $("pdfBtn").addEventListener("click", () =>
     downloadAllPdf("labels_" + padDate2($("dateSelect").value).replace(/\./g, "-") + ".pdf"));
-  $("printBtn").addEventListener("click", () => printLabels(GENERATED));
+  $("printBtn").addEventListener("click", () => printLabels(visibleGenerated()));
+  $("search").addEventListener("input", applyFilter);
   init();
 });
