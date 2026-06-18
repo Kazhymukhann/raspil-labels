@@ -8,12 +8,23 @@
 </head>
 <body>
   <header>
-    <h1>🏷️ Бирки для пильного центра</h1>
-    <p>Выбери дату задания и нажми кнопку — бирки соберутся из таблицы автоматически.</p>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" fill="none" stroke="#7cb342" stroke-width="2"
+           stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+        <path d="M16 3 L28 9 V23 L16 29 L4 23 V9 Z"/>
+        <path d="M4 9 L16 15 L28 9"/>
+        <path d="M16 15 V29"/>
+      </svg>
+      <div class="brand-text">
+        <h1>PackSmart</h1>
+        <p>Бирки для пильного центра</p>
+      </div>
+    </div>
   </header>
 
   <main>
     <div class="panel">
+      <p class="hint">Выбери дату задания и нажми «Сформировать бирки» — данные подтянутся из таблицы автоматически.</p>
       <div class="row">
         <label for="dateSelect">Дата задания</label>
         <select id="dateSelect"><option>загрузка…</option></select>
