@@ -41,7 +41,7 @@ def drive_service():
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
-def list_children(svc, parent, only_folders=False, fields="id,name,mimeType,md5Checksum", extra=""):
+def list_children(svc, parent, only_folders=False, fields="id,name,mimeType,md5Checksum", extra="", order_by=None):
     q = "'%s' in parents and trashed=false" % parent
     if only_folders:
         q += " and mimeType = '%s'" % FOLDER_MIME
@@ -50,7 +50,7 @@ def list_children(svc, parent, only_folders=False, fields="id,name,mimeType,md5C
     out, token = [], None
     while True:
         r = svc.files().list(q=q, fields="nextPageToken, files(%s)" % fields,
-                             pageToken=token, pageSize=1000,
+                             pageToken=token, pageSize=1000, orderBy=order_by,
                              supportsAllDrives=True, includeItemsFromAllDrives=True).execute(num_retries=5)
         out += r.get("files", [])
         token = r.get("nextPageToken")
@@ -128,7 +128,8 @@ def main():
 
     days = int(os.environ.get("SYNC_DAYS") or "7")    # берём только свежие раскрои
     since = (datetime.datetime.utcnow() - datetime.timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    xmls = [f for f in list_children(svc, XML_FOLDER_ID, extra="and modifiedTime > '%s'" % since)
+    xmls = [f for f in list_children(svc, XML_FOLDER_ID, extra="and modifiedTime > '%s'" % since,
+                                     order_by="modifiedTime desc")   # свежие — первыми
             if f["name"].lower().endswith(".xml")]
     print("XML за последние %d дн.: %d" % (days, len(xmls)))
 
