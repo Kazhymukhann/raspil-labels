@@ -11,6 +11,10 @@ raspil_cache.csv
 # сгенерированные бирки
 labels/*.emf
 
+# локальные логи синхронизации
+sync-all.log
+sync-all.pid
+
 # системное
 .DS_Store
 __pycache__/
