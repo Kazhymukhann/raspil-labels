@@ -128,7 +128,7 @@ def main():
             if f["name"].lower().endswith(".xml")]
     print("XML в источнике: %d" % len(xmls))
 
-    made = skipped = missing = 0
+    made = skipped = missing = errors = 0
     for x in xmls:
         try:
             folder, n, material = parse_xml_bytes(download_bytes(svc, x["id"]))
@@ -145,20 +145,45 @@ def main():
         data = emf_bytes(dict(part, date=date, qty=str(n)))
         digest = hashlib.md5(data).hexdigest()
 
-        sub = get_or_create_subfolder(svc, LABELS_FOLDER_ID, folder)
-        existing = list_children(svc, sub)
-        same = (len(existing) == n and all(f.get("md5Checksum") == digest for f in existing))
-        if same:
-            skipped += 1; continue
+        try:
+            sub = get_or_create_subfolder(svc, LABELS_FOLDER_ID, folder)
+            existing = list_children(svc, sub)
+            if len(existing) == n and all(f.get("md5Checksum") == digest for f in existing):
+                skipped += 1; continue
 
-        for f in existing:                            # очистить и переписать
-            svc.files().delete(fileId=f["id"], supportsAllDrives=True).execute()
-        for i in range(1, n + 1):
-            upload_label(svc, sub, "label%d.emf" % i, data)
-        print("  ✓ %s: %d бирок (Место %s, %s)" % (folder, n, part["cell"] or "—", date))
-        made += 1
+            by_name = {}
+            for f in existing:
+                by_name.setdefault(f["name"], []).append(f)
 
-    print("Готово. Обновлено: %d, без изменений: %d, нет в базе: %d" % (made, skipped, missing))
+            def trash(fid):                            # чужие файлы удалить нельзя — пробуем мягко
+                try:
+                    svc.files().update(fileId=fid, body={"trashed": True}, supportsAllDrives=True).execute()
+                except Exception:
+                    pass
+
+            for i in range(1, n + 1):                  # обновляем на месте / создаём недостающие
+                nm = "label%d.emf" % i
+                fs = by_name.pop(nm, [])
+                if fs:
+                    if fs[0].get("md5Checksum") != digest:
+                        svc.files().update(fileId=fs[0]["id"], supportsAllDrives=True,
+                            media_body=MediaIoBaseUpload(io.BytesIO(data),
+                                                         mimetype="application/octet-stream")).execute()
+                    for dup in fs[1:]:
+                        trash(dup["id"])
+                else:
+                    upload_label(svc, sub, nm, data)
+            for nm, fs in by_name.items():             # лишние labelN -> в корзину (мягко)
+                if re.match(r"label\d+\.emf$", nm):
+                    for f in fs:
+                        trash(f["id"])
+            print("  ✓ %s: %d бирок (Место %s, %s)" % (folder, n, part["cell"] or "—", date))
+            made += 1
+        except Exception as e:
+            print("  ! %s — ошибка записи: %s" % (folder, str(e)[:160])); errors += 1
+
+    print("Готово. Обновлено: %d, без изменений: %d, нет в базе: %d, ошибок: %d"
+          % (made, skipped, missing, errors))
 
 
 if __name__ == "__main__":
