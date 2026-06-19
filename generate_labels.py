@@ -114,6 +114,29 @@ def fetch_base(offline=False):
     return base
 
 
+def parse_xml(path):
+    """XML раскроя (BAZIS) -> (folder, count, material).
+    folder — имя папки из code «labels\\folder\\labelN»; count — число бирок (label1..labelN).
+    """
+    import re
+    import xml.etree.ElementTree as ET
+    root = ET.parse(path).getroot()
+    folder, material, labelset = None, "", set()
+    for el in root.iter():
+        if not material and el.get("material"):
+            material = el.get("material").strip()
+        code = (el.get("code") or "").strip()
+        if "label" not in code.lower():
+            continue
+        comps = re.split(r"[\\/]", code)
+        if len(comps) >= 2:
+            folder = comps[-2]
+        m = re.search(r"(label\d+)", comps[-1], re.I)
+        if m:
+            labelset.add(m.group(1).lower())
+    return folder, len(labelset), material
+
+
 def fetch_csv(sheet, cache_name):
     """Скачать вкладку как CSV (живьём по имени) + кэш."""
     cache = os.path.join(HERE, cache_name)
@@ -340,13 +363,35 @@ def main():
     def opt(flag):
         return args[args.index(flag) + 1] if flag in args else None
 
+    os.makedirs(OUT_DIR, exist_ok=True)
+
+    # ---- режим XML: по раскрою BAZIS -> N одинаковых бирок в одноимённую папку ----
+    if "--xml" in args:
+        base = fetch_base(offline=offline)
+        folder, n, material = parse_xml(opt("--xml"))
+        if not folder or not n:
+            print("  ! В XML не найдены бирки (label-коды)"); sys.exit(1)
+        pname = folder[:-(len(material) + 1)] if material and folder.endswith("-" + material) else folder
+        base_norm = {k.replace("/", "-"): v for k, v in base.items()}
+        part = base_norm.get(pname)
+        if part is None:
+            print("  ! Деталь не найдена в базе: %r (папка %r)" % (pname, folder)); sys.exit(1)
+        outdir = os.path.join(OUT_DIR, folder)
+        os.makedirs(outdir, exist_ok=True)
+        today = datetime.date.today().strftime("%d.%m.%Y")
+        img = draw_label(dict(part, date=today, qty=str(n)))
+        for i in range(1, n + 1):
+            save_emf(img, os.path.join(outdir, "label%d.emf" % i))
+        print("  %d бирок -> %s  (деталь %s, Место %s)"
+              % (n, outdir, part["name"], part["cell"] or "—"))
+        return
+
     if not SHEET_ID and not offline:
         print("  ! Не задан ID таблицы. Создай config.json (см. config.example.json)\n"
               "    или задай: export RASPIL_SHEET_ID=<id>")
         sys.exit(1)
 
     base = fetch_base(offline=offline)
-    os.makedirs(OUT_DIR, exist_ok=True)
 
     # ---- собираем список заданий: (name, qty, date) ----
     jobs = []

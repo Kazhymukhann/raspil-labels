@@ -265,6 +265,57 @@ async function downloadZip() {
   setStatus(`Скачано ${list.length} бирок (ZIP).`, "ok");
 }
 
+// ----- режим XML (раскрой BAZIS) -----
+function parseXmlText(text) {
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  let folder = null, material = "", labels = new Set();
+  doc.querySelectorAll("*").forEach((el) => {
+    if (!material && el.getAttribute("material")) material = el.getAttribute("material").trim();
+    const code = (el.getAttribute("code") || "").trim();
+    if (!/label/i.test(code)) return;
+    const comps = code.split(/[\\/]/);
+    if (comps.length >= 2) folder = comps[comps.length - 2];
+    const m = comps[comps.length - 1].match(/label\d+/i);
+    if (m) labels.add(m[0].toLowerCase());
+  });
+  return { folder, count: labels.size, material };
+}
+
+let XML_FOLDER = "", XML_BYTES = null, XML_COUNT = 0;
+async function handleXml(file) {
+  const xr = $("xmlResult");
+  try {
+    const { folder, count, material } = parseXmlText(await file.text());
+    if (!folder || !count) { xr.innerHTML = '<span class="err">В XML не найдены бирки (label-коды).</span>'; return; }
+    const pname = (material && folder.endsWith("-" + material)) ? folder.slice(0, -(material.length + 1)) : folder;
+    const part = Object.values(BASE).find((p) => String(p.name || "").replace(/\//g, "-") === pname);
+    if (!part) { xr.innerHTML = '<span class="err">Деталь не найдена в базе: ' + esc(pname) + '</span>'; return; }
+    const p = Object.assign({}, part, { date: todayStr(), qty: String(count) });
+    const canvas = document.createElement("canvas"); drawLabel(canvas, p);
+    XML_FOLDER = folder; XML_BYTES = makeEMF(canvas); XML_COUNT = count;
+    const img = document.createElement("img"); img.className = "thumb"; img.src = canvas.toDataURL("image/png");
+    img.style.maxWidth = "320px";
+    xr.innerHTML = "";
+    xr.appendChild(img);
+    const info = document.createElement("div"); info.className = "info";
+    info.innerHTML = "<b>" + esc(part.name) + "</b><span>Папка: " + esc(folder) +
+      "</span><span>Будет создано <b>" + count + "</b> бирок (label1…label" + count + ")</span>";
+    xr.appendChild(info);
+    const btn2 = document.createElement("button"); btn2.className = "primary";
+    btn2.textContent = "⬇ Скачать папку (" + count + " бирок, ZIP)";
+    btn2.onclick = downloadXmlZip;
+    xr.appendChild(btn2);
+  } catch (e) { xr.innerHTML = '<span class="err">Ошибка XML: ' + esc(e.message) + '</span>'; }
+}
+async function downloadXmlZip() {
+  if (!XML_BYTES) return;
+  const zip = new JSZip();
+  for (let i = 1; i <= XML_COUNT; i++) zip.file(XML_FOLDER + "/label" + i + ".emf", XML_BYTES);
+  const blob = await zip.generateAsync({ type: "blob" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = XML_FOLDER + ".zip"; a.click();
+}
+
 function visibleGenerated() {
   return QUERY ? GENERATED.filter((g) => g.search.includes(QUERY)) : GENERATED;
 }
@@ -296,5 +347,6 @@ window.addEventListener("DOMContentLoaded", () => {
     downloadAllPdf("labels_" + padDate2(ACTIVE_DATE).replace(/\./g, "-") + ".pdf"));
   $("printBtn").addEventListener("click", () => printLabels(visibleGenerated()));
   $("search").addEventListener("input", applyFilter);
+  $("xmlFile").addEventListener("change", (e) => { if (e.target.files[0]) handleXml(e.target.files[0]); });
   init();
 });

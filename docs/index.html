@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Бирки — Пильный центр</title>
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <header>
@@ -34,6 +34,14 @@
       <div id="status" class="status">Запуск…</div>
     </div>
 
+    <div class="panel">
+      <p class="hint">📄 <b>Бирки по XML раскроя (для станка)</b> — выбери XML-файл, получишь готовую папку с нужным числом бирок (label1…labelN) для заливки в Google Drive.</p>
+      <div class="row">
+        <input type="file" id="xmlFile" accept=".xml,text/xml">
+      </div>
+      <div id="xmlResult" class="xmlresult"></div>
+    </div>
+
     <div class="searchbar" id="searchbar" hidden>
       <i aria-hidden="true">🔎</i>
       <input id="search" type="search" placeholder="Поиск по названию, месту или материалу…" autocomplete="off">
@@ -51,10 +59,10 @@
   <script src="vendor/qrcode.min.js"></script>
   <script src="vendor/jszip.min.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
-  <script src="icon.js?v=7"></script>
-  <script src="config.js?v=7"></script>
-  <script src="label.js?v=7"></script>
-  <script src="export.js?v=7"></script>
-  <script src="app.js?v=7"></script>
+  <script src="icon.js?v=8"></script>
+  <script src="config.js?v=8"></script>
+  <script src="label.js?v=8"></script>
+  <script src="export.js?v=8"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
