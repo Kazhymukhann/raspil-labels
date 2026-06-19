@@ -156,7 +156,7 @@ PROJECT.md             этот документ
 - **Поменять кол-во/дату/добавить задачи** → правишь **РАСПИЛ**.
   → Бирки в Drive обновятся при следующем прогоне (~5 минут). Срочно: GitHub → **Actions** →
   «Синхронизация бирок в Drive» → **Run workflow**.
-- **Полный прогон по всей истории** (все XML): Actions → Run workflow → поле **days = 3650** (идёт долго).
+- **Полный прогон по всей истории** (все XML): Actions → Run workflow → поле **days = all** (идёт долго).
 - **Изменить интервал**: `.github/workflows/sync.yml`, строка `cron`. На GitHub минимум — 5 минут.
 - **Деталь не делается** («нет в базе») → её надо добавить в **Details List**.
 - **Запустить вручную локально**: `python3 sync_drive.py` (нужен `.env` с ключами + `pip install pillow segno google-api-python-client google-auth`).

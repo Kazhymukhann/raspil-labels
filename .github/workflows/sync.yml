@@ -6,7 +6,7 @@ on:
   workflow_dispatch:            # ручной запуск
     inputs:
       days:
-        description: "За сколько дней брать XML (пусто = 7; для полного прогона по всей истории: 3650)"
+        description: "За сколько дней брать XML (пусто = 7; для полного прогона по всей истории: all)"
         required: false
         default: ""
 

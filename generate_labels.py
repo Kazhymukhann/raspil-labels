@@ -24,7 +24,7 @@
 Данные: РАСПИЛ -> какие детали, сколько штук, дата;  BASE -> материал, МЕСТО, размеры, CNC.
 """
 
-import sys, os, csv, io, json, urllib.request, urllib.parse
+import sys, os, csv, io, json, re, urllib.request, urllib.parse
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -45,6 +45,17 @@ def _load_dotenv():
         os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 _load_dotenv()
+
+def norm_part_name(name):
+    """Ключ для сопоставления имён из XML/РАСПИЛ/BASE."""
+    s = str(name or "").strip().replace("\u00a0", " ")
+    s = s.replace("/", "-").replace("Х", "x").replace("х", "x")
+    s = re.sub(r"\s+", " ", s)
+    return s.casefold()
+
+def build_part_lookup(base):
+    """Нормализованный lookup: имя детали -> поля BASE."""
+    return {norm_part_name(k): v for k, v in base.items()}
 
 def load_sheet_id():
     """ID Google-таблицы. Берётся из env RASPIL_SHEET_ID или из config.json
@@ -171,6 +182,14 @@ def parse_xml(path):
     return folder, len(labelset), material
 
 
+def parse_label_ref(text):
+    """Строка Д1/Д2/... вида «Имя-12шт | A1» -> {name, qty}."""
+    m = re.match(r"\s*(.+?)\s*-\s*(\d+)\s*шт\b", str(text or ""), re.U | re.I)
+    if not m:
+        return None
+    return {"name": m.group(1).strip(), "qty": int(m.group(2))}
+
+
 def fetch_csv(sheet, cache_name):
     """Скачать вкладку как CSV (живьём по имени) + кэш."""
     cache = os.path.join(HERE, cache_name)
@@ -185,11 +204,10 @@ def fetch_csv(sheet, cache_name):
 
 
 def parse_job(date_filter=None, offline=False):
-    """Читает вкладку РАСПИЛ: Наименование (B) + кол-во (C) + Дата (A).
+    """Читает вкладку РАСПИЛ: Д1/Д2/Д3/... дают имя детали и кол-во в партии.
 
     Возвращает список {name, qty, date}; количество суммируется по детали за день.
     """
-    import re
     if offline:
         rows = list(csv.reader(io.StringIO(open(os.path.join(HERE, "raspil_cache.csv"),
                                                 encoding="utf-8").read())))
@@ -206,8 +224,7 @@ def parse_job(date_filter=None, offline=False):
     date_i = header.index("Дата") if "Дата" in header else 0           # A
     name_i = header.index("Наименование") if "Наименование" in header else 1  # B
     qty_i = header.index("кол-во") if "кол-во" in header else 2         # C (запас)
-    d1_i = header.index("Д1") if "Д1" in header else -1                 # E: «Имя-Nшт | ...»
-    sht = re.compile(r"-\s*(\d+)\s*шт", re.U)
+    detail_cols = [i for i, h in enumerate(header) if re.match(r"Д\d+$", str(h or "").strip(), re.U | re.I)]
     want = norm_date(date_filter) if date_filter and date_filter != "all" else None
 
     order, acc = [], {}
@@ -222,18 +239,26 @@ def parse_job(date_filter=None, offline=False):
         name = r[name_i].strip()
         if not name:
             continue
-        # кол-во в партии — Nшт из Д1 (столбец E); запас — «кол-во» (C)
-        m = sht.search(r[d1_i]) if 0 <= d1_i < len(r) else None
-        if m:
-            qty = int(m.group(1))
-        else:
+        refs = []
+        for i in detail_cols:
+            if i < len(r):
+                ref = parse_label_ref(r[i])
+                if ref:
+                    refs.append(ref)
+
+        # Старые/ручные строки без Д1 оставляем читаемыми, но синхронизация считает
+        # корректным источником именно Д-колонки.
+        if not refs:
             digits = re.sub(r"[^\d]", "", r[qty_i]) if qty_i < len(r) else ""
-            qty = int(digits) if digits else 0
-        key = (name, rdate)
-        if key not in acc:
-            acc[key] = {"name": name, "qty": 0, "date": rdate}
-            order.append(key)
-        acc[key]["qty"] += qty
+            if digits:
+                refs.append({"name": name, "qty": int(digits)})
+
+        for ref in refs:
+            key = (ref["name"], rdate)
+            if key not in acc:
+                acc[key] = {"name": ref["name"], "qty": 0, "date": rdate}
+                order.append(key)
+            acc[key]["qty"] += ref["qty"]
     return [acc[k] for k in order]
 
 # ---------------------------------------------------------------- QR
@@ -406,8 +431,8 @@ def main():
         if not folder or not n:
             print("  ! В XML не найдены бирки (label-коды)"); sys.exit(1)
         pname = folder[:-(len(material) + 1)] if material and folder.endswith("-" + material) else folder
-        base_norm = {k.replace("/", "-"): v for k, v in base.items()}
-        part = base_norm.get(pname)
+        base_norm = build_part_lookup(base)
+        part = base_norm.get(norm_part_name(pname))
         if part is None:
             print("  ! Деталь не найдена в базе: %r (папка %r)" % (pname, folder)); sys.exit(1)
         outdir = os.path.join(OUT_DIR, folder)
@@ -426,6 +451,7 @@ def main():
         sys.exit(1)
 
     base = fetch_base(offline=offline)
+    base_lookup = build_part_lookup(base)
 
     # ---- собираем список заданий: (name, qty, date) ----
     jobs = []
@@ -452,7 +478,7 @@ def main():
     # ---- генерим бирки ----
     n = 0
     for name, qty, date in jobs:
-        part = base.get(name)
+        part = base.get(name) or base_lookup.get(norm_part_name(name))
         if part is None:
             print("  ! НЕ найдено в BASE: %r — пропуск" % name)
             continue

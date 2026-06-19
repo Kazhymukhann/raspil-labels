@@ -3,6 +3,7 @@ const CFG = window.RASPIL_CONFIG || {};
 const $ = (id) => document.getElementById(id);
 
 let BASE = {};          // имя детали -> поля
+let BASE_LOOKUP = {};   // нормализованное имя детали -> поля
 let JOB = [];           // текущее задание [{name, qty, date}]
 let GENERATED = [];     // [{filename, bytes, part, png, card, search}]
 let QUERY = "";         // строка поиска (фильтр карточек)
@@ -20,6 +21,15 @@ function normDate(s) {
   if (p.length === 3 && p.every((x) => /^\d+$/.test(x.trim())))
     return p.map((x) => String(parseInt(x, 10))).join(".");
   return s;
+}
+function normPartName(s) {
+  return String(s || "")
+    .trim()
+    .replace(/\u00a0/g, " ")
+    .replace(/\//g, "-")
+    .replace(/[Хх]/g, "x")
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("ru-RU");
 }
 function dateKey(d) {                       // для сортировки
   const p = normDate(d).split(".");
@@ -93,6 +103,7 @@ function buildBase(rows) {
   const col = (r, n) => { const i = idx[n]; return i != null && i < r.length ? (r[i] || "").trim() : ""; };
   const colN = (r, n) => idx[n] == null ? null : (idx[n] < r.length ? (r[idx[n]] || "").trim() : "");
   const map = {};
+  const lookup = {};
   for (let k = 1; k < rows.length; k++) {
     const r = rows[k]; if (!r || !(r[0] || "").trim()) continue;
     const name = r[0].trim();
@@ -101,7 +112,9 @@ function buildBase(rows) {
       prisadka: col(r, "Присадка"), length: col(r, "Длина"), width: col(r, "Ширина"),
       tolk: colN(r, "ТолК"), dk: colN(r, "ДК"), shk: colN(r, "ШК"),  // кромка (null = колонки нет)
     };
+    lookup[normPartName(name)] = map[name];
   }
+  BASE_LOOKUP = lookup;
   return map;
 }
 
@@ -189,7 +202,7 @@ async function generate() {
   const grid = $("grid"); grid.innerHTML = ""; GENERATED = [];
   let n = 0, skipped = [];
   for (const j of JOB) {
-    const b = BASE[j.name];
+    const b = BASE[j.name] || BASE_LOOKUP[normPartName(j.name)];
     if (!b) { skipped.push(j.name); continue; }
     n++;
     const part = Object.assign({}, b, { date: j.date, qty: j.qty });
@@ -288,11 +301,11 @@ async function handleXml(file) {
     const { folder, count, material } = parseXmlText(await file.text());
     if (!folder || !count) { xr.innerHTML = '<span class="err">В XML не найдены бирки (label-коды).</span>'; return; }
     const pname = (material && folder.endsWith("-" + material)) ? folder.slice(0, -(material.length + 1)) : folder;
-    const part = Object.values(BASE).find((p) => String(p.name || "").replace(/\//g, "-") === pname);
+    const part = BASE_LOOKUP[normPartName(pname)];
     if (!part) { xr.innerHTML = '<span class="err">Деталь не найдена в базе: ' + esc(pname) + '</span>'; return; }
     // кол-во НА БИРКЕ — из РАСПИЛ (Д1, столбец E) по имени; число файлов = count (из XML)
-    const ri = (RASPIL_ROWS ? parseJob(RASPIL_ROWS, "all").find((j) => j.name === part.name) : null) || {};
-    const p = Object.assign({}, part, { date: ri.date || todayStr(), qty: String(ri.qty || count) });
+    const ri = (RASPIL_ROWS ? parseJob(RASPIL_ROWS, "all").find((j) => normPartName(j.name) === normPartName(part.name)) : null) || {};
+    const p = Object.assign({}, part, { date: ri.date || todayStr(), qty: String(ri.qty == null ? count : ri.qty) });
     const canvas = document.createElement("canvas"); drawLabel(canvas, p);
     XML_FOLDER = folder; XML_BYTES = makeEMF(canvas); XML_COUNT = count;
     const img = document.createElement("img"); img.className = "thumb"; img.src = canvas.toDataURL("image/png");
