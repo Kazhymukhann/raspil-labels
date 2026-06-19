@@ -15,4 +15,8 @@ window.RASPIL_CONFIG = {
   // Если заполнить — будут использоваться вместо ID выше.
   raspilCsvUrl: "",
   baseCsvUrl:   "",
+
+  // Автозаливка бирок в Google Drive (Apps Script web app). Вставь сюда URL после
+  // развёртывания скрипта (см. drive-auto/SETUP.md). Пусто — кнопки заливки нет.
+  driveUploadUrl: "",
 };

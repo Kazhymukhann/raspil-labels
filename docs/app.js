@@ -301,10 +301,23 @@ async function handleXml(file) {
     info.innerHTML = "<b>" + esc(part.name) + "</b><span>Папка: " + esc(folder) +
       "</span><span>Будет создано <b>" + count + "</b> бирок (label1…label" + count + ")</span>";
     xr.appendChild(info);
-    const btn2 = document.createElement("button"); btn2.className = "primary";
-    btn2.textContent = "⬇ Скачать папку (" + count + " бирок, ZIP)";
-    btn2.onclick = downloadXmlZip;
-    xr.appendChild(btn2);
+    const acts = document.createElement("div"); acts.className = "row buttons";
+    if (CFG.driveUploadUrl) {
+      const dbtn = document.createElement("button"); dbtn.className = "primary";
+      dbtn.textContent = "☁ Залить в Drive (" + count + ")";
+      const dstatus = document.createElement("div"); dstatus.className = "status";
+      dbtn.onclick = () => uploadToDrive(dstatus);
+      acts.appendChild(dbtn);
+      const zbtn = document.createElement("button");
+      zbtn.textContent = "⬇ Скачать папку (ZIP)"; zbtn.onclick = downloadXmlZip;
+      acts.appendChild(zbtn);
+      xr.appendChild(acts); xr.appendChild(dstatus);
+    } else {
+      const zbtn = document.createElement("button"); zbtn.className = "primary";
+      zbtn.textContent = "⬇ Скачать папку (" + count + " бирок, ZIP)";
+      zbtn.onclick = downloadXmlZip;
+      xr.appendChild(zbtn);
+    }
   } catch (e) { xr.innerHTML = '<span class="err">Ошибка XML: ' + esc(e.message) + '</span>'; }
 }
 async function downloadXmlZip() {
@@ -314,6 +327,26 @@ async function downloadXmlZip() {
   const blob = await zip.generateAsync({ type: "blob" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = XML_FOLDER + ".zip"; a.click();
+}
+
+function base64FromBytes(u8) {
+  let s = ""; const chunk = 0x8000;
+  for (let i = 0; i < u8.length; i += chunk) s += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
+  return btoa(s);
+}
+async function uploadToDrive(statusEl) {
+  if (!XML_BYTES || !CFG.driveUploadUrl) return;
+  statusEl.textContent = "Заливаю в Drive…"; statusEl.className = "status";
+  try {
+    const payload = JSON.stringify({ folder: XML_FOLDER, count: XML_COUNT, b64: base64FromBytes(XML_BYTES) });
+    // text/plain -> простой запрос без CORS-preflight; ответ непрозрачный (no-cors)
+    await fetch(CFG.driveUploadUrl, { method: "POST", mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, body: payload });
+    statusEl.textContent = "Отправлено в Drive: " + XML_COUNT + " бирок в папку «" + XML_FOLDER + "». Проверьте Drive.";
+    statusEl.className = "status ok";
+  } catch (e) {
+    statusEl.textContent = "Ошибка заливки: " + e.message; statusEl.className = "status err";
+  }
 }
 
 function visibleGenerated() {
