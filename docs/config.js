@@ -18,5 +18,5 @@ window.RASPIL_CONFIG = {
 
   // Автозаливка бирок в Google Drive (Apps Script web app). Вставь сюда URL после
   // развёртывания скрипта (см. drive-auto/SETUP.md). Пусто — кнопки заливки нет.
-  driveUploadUrl: "https://script.google.com/macros/s/AKfycbwiA0Exi4V7kGQCnI6hGs1Lj4Z81UmBvqgnVKPy0LEs3NMF7r9fq7B9GacFsoDJpeCmeg/exec",
+  driveUploadUrl: "",
 };

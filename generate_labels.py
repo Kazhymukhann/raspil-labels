@@ -65,9 +65,28 @@ MATERIAL_DISPLAY = {
     "ЛДСП Белый":       "ЛДСП «Белый»",
 }
 
-FONTS = "/System/Library/Fonts/Supplemental/"
+FONT_DIRS = [
+    "/System/Library/Fonts/Supplemental/",          # macOS
+    "/usr/share/fonts/truetype/msttcorefonts/",      # Linux: Arial из msttcorefonts
+    "/usr/share/fonts/truetype/liberation/",         # Linux: Liberation (метрики Arial)
+]
+FONT_ALIASES = {
+    "Arial.ttf":       ["Arial.ttf", "arial.ttf", "LiberationSans-Regular.ttf", "DejaVuSans.ttf"],
+    "Arial Bold.ttf":  ["Arial Bold.ttf", "Arial_Bold.ttf", "arialbd.ttf", "LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf"],
+    "Arial Black.ttf": ["Arial Black.ttf", "Arial_Black.ttf", "ariblk.ttf", "LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf"],
+}
 def font(name, size):
-    return ImageFont.truetype(FONTS + name, size)
+    for d in FONT_DIRS:
+        for fn in FONT_ALIASES.get(name, [name]):
+            p = os.path.join(d, fn)
+            if os.path.exists(p):
+                return ImageFont.truetype(p, size)
+    for fn in FONT_ALIASES.get(name, [name]):           # пусть PIL поищет сам
+        try:
+            return ImageFont.truetype(fn, size)
+        except Exception:
+            pass
+    return ImageFont.load_default()
 
 # ---------------------------------------------------------------- база (DB)
 def fetch_base(offline=False):
