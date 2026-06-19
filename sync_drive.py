@@ -51,7 +51,7 @@ def list_children(svc, parent, only_folders=False, fields="id,name,mimeType,md5C
     while True:
         r = svc.files().list(q=q, fields="nextPageToken, files(%s)" % fields,
                              pageToken=token, pageSize=1000,
-                             supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+                             supportsAllDrives=True, includeItemsFromAllDrives=True).execute(num_retries=5)
         out += r.get("files", [])
         token = r.get("nextPageToken")
         if not token:
@@ -64,17 +64,17 @@ def get_or_create_subfolder(svc, parent, name):
         if f["name"] == name:
             return f["id"]
     meta = {"name": name, "mimeType": FOLDER_MIME, "parents": [parent]}
-    return svc.files().create(body=meta, fields="id", supportsAllDrives=True).execute()["id"]
+    return svc.files().create(body=meta, fields="id", supportsAllDrives=True).execute(num_retries=5)["id"]
 
 
 def download_bytes(svc, file_id):
-    return svc.files().get_media(fileId=file_id, supportsAllDrives=True).execute()
+    return svc.files().get_media(fileId=file_id, supportsAllDrives=True).execute(num_retries=5)
 
 
 def upload_label(svc, parent, name, data):
     media = MediaIoBaseUpload(io.BytesIO(data), mimetype="application/octet-stream", resumable=False)
     meta = {"name": name, "parents": [parent]}
-    svc.files().create(body=meta, media_body=media, fields="id", supportsAllDrives=True).execute()
+    svc.files().create(body=meta, media_body=media, fields="id", supportsAllDrives=True).execute(num_retries=5)
 
 
 def parse_xml_bytes(b):
@@ -126,7 +126,7 @@ def main():
     dates = raspil_dates()
     today = datetime.date.today().strftime("%d.%m.%Y")
 
-    days = int(os.environ.get("SYNC_DAYS", "7"))      # берём только свежие раскрои
+    days = int(os.environ.get("SYNC_DAYS") or "7")    # берём только свежие раскрои
     since = (datetime.datetime.utcnow() - datetime.timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     xmls = [f for f in list_children(svc, XML_FOLDER_ID, extra="and modifiedTime > '%s'" % since)
             if f["name"].lower().endswith(".xml")]
@@ -161,7 +161,7 @@ def main():
 
             def trash(fid):                            # чужие файлы удалить нельзя — пробуем мягко
                 try:
-                    svc.files().update(fileId=fid, body={"trashed": True}, supportsAllDrives=True).execute()
+                    svc.files().update(fileId=fid, body={"trashed": True}, supportsAllDrives=True).execute(num_retries=5)
                 except Exception:
                     pass
 
@@ -172,7 +172,7 @@ def main():
                     if fs[0].get("md5Checksum") != digest:
                         svc.files().update(fileId=fs[0]["id"], supportsAllDrives=True,
                             media_body=MediaIoBaseUpload(io.BytesIO(data),
-                                                         mimetype="application/octet-stream")).execute()
+                                                         mimetype="application/octet-stream")).execute(num_retries=5)
                     for dup in fs[1:]:
                         trash(dup["id"])
                 else:
