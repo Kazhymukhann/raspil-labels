@@ -340,7 +340,7 @@ async function uploadToDrive(statusEl) {
   try {
     const payload = JSON.stringify({ folder: XML_FOLDER, count: XML_COUNT, b64: base64FromBytes(XML_BYTES) });
     // text/plain -> простой запрос без CORS-preflight; ответ непрозрачный (no-cors)
-    await fetch(CFG.driveUploadUrl, { method: "POST", mode: "no-cors",
+    await fetch(CFG.driveUploadUrl, { method: "POST", mode: "no-cors", credentials: "include",
       headers: { "Content-Type": "text/plain;charset=utf-8" }, body: payload });
     statusEl.textContent = "Отправлено в Drive: " + XML_COUNT + " бирок в папку «" + XML_FOLDER + "». Проверьте Drive.";
     statusEl.className = "status ok";
