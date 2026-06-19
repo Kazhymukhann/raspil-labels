@@ -9,6 +9,12 @@
 //    Пример ссылки: https://drive.google.com/drive/folders/1AbCdEf... -> ID = 1AbCdEf...
 const PARENT_FOLDER_ID = '1TO1PtrQA5TOvpSzS4TNRcglSIUjGbvbR';
 
+// Запусти ЭТУ функцию один раз в редакторе (кнопка ▶), чтобы выдать доступ к Drive.
+function setup() {
+  const f = DriveApp.getFolderById(PARENT_FOLDER_ID);
+  Logger.log('Доступ к папке есть: ' + f.getName());
+}
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
