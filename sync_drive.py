@@ -41,10 +41,12 @@ def drive_service():
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
-def list_children(svc, parent, only_folders=False, fields="id,name,mimeType,md5Checksum"):
+def list_children(svc, parent, only_folders=False, fields="id,name,mimeType,md5Checksum", extra=""):
     q = "'%s' in parents and trashed=false" % parent
     if only_folders:
         q += " and mimeType = '%s'" % FOLDER_MIME
+    if extra:
+        q += " " + extra
     out, token = [], None
     while True:
         r = svc.files().list(q=q, fields="nextPageToken, files(%s)" % fields,
@@ -124,9 +126,11 @@ def main():
     dates = raspil_dates()
     today = datetime.date.today().strftime("%d.%m.%Y")
 
-    xmls = [f for f in list_children(svc, XML_FOLDER_ID)
+    days = int(os.environ.get("SYNC_DAYS", "7"))      # берём только свежие раскрои
+    since = (datetime.datetime.utcnow() - datetime.timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    xmls = [f for f in list_children(svc, XML_FOLDER_ID, extra="and modifiedTime > '%s'" % since)
             if f["name"].lower().endswith(".xml")]
-    print("XML в источнике: %d" % len(xmls))
+    print("XML за последние %d дн.: %d" % (days, len(xmls)))
 
     made = skipped = missing = errors = 0
     for x in xmls:
