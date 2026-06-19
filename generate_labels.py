@@ -31,6 +31,21 @@ from PIL import Image, ImageDraw, ImageFont
 # ---------------------------------------------------------------- настройки
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+def _load_dotenv():
+    """Подхватить ключи/настройки из файла .env (рядом со скриптом).
+    Уже заданные переменные окружения (напр. на GitHub) имеют приоритет."""
+    path = os.path.join(HERE, ".env")
+    if not os.path.exists(path):
+        return
+    for line in open(path, encoding="utf-8"):
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+_load_dotenv()
+
 def load_sheet_id():
     """ID Google-таблицы. Берётся из env RASPIL_SHEET_ID или из config.json
     (config.json не хранится в репозитории — впиши свой ID, см. config.example.json)."""

@@ -1,3 +1,9 @@
+# ключи и секреты — НЕ публиковать
+.env
+config.json
+drive-auto/client_secret.json
+*.client_secret.json
+
 # кэши выгрузок из таблицы (содержат цены/бонусы/ссылки — тянутся живьём)
 base_cache.csv
 raspil_cache.csv
@@ -10,13 +16,5 @@ labels/*.emf
 __pycache__/
 *.pyc
 
-# локальный конфиг с ID таблицы (не публиковать)
-config.json
-
-# локальные инструменты
+# локальные инструменты IDE/агента
 .claude/
-server.js
-
-# OAuth ключи (НЕ публиковать)
-drive-auto/client_secret.json
-*.client_secret.json
