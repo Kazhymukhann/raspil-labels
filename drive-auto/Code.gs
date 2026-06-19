@@ -7,7 +7,7 @@
 // 1) Вставь сюда ID папки "labels" на твоём Google Drive.
 //    ID — это часть ссылки на папку между /folders/ и следующим / или ?
 //    Пример ссылки: https://drive.google.com/drive/folders/1AbCdEf... -> ID = 1AbCdEf...
-const PARENT_FOLDER_ID = 'ВСТАВЬ_ID_ПАПКИ_labels';
+const PARENT_FOLDER_ID = '1TO1PtrQA5TOvpSzS4TNRcglSIUjGbvbR';
 
 function doPost(e) {
   try {
