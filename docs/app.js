@@ -290,7 +290,9 @@ async function handleXml(file) {
     const pname = (material && folder.endsWith("-" + material)) ? folder.slice(0, -(material.length + 1)) : folder;
     const part = Object.values(BASE).find((p) => String(p.name || "").replace(/\//g, "-") === pname);
     if (!part) { xr.innerHTML = '<span class="err">Деталь не найдена в базе: ' + esc(pname) + '</span>'; return; }
-    const p = Object.assign({}, part, { date: todayStr(), qty: String(count) });
+    // кол-во НА БИРКЕ — из РАСПИЛ (Д1, столбец E) по имени; число файлов = count (из XML)
+    const ri = (RASPIL_ROWS ? parseJob(RASPIL_ROWS, "all").find((j) => j.name === part.name) : null) || {};
+    const p = Object.assign({}, part, { date: ri.date || todayStr(), qty: String(ri.qty || count) });
     const canvas = document.createElement("canvas"); drawLabel(canvas, p);
     XML_FOLDER = folder; XML_BYTES = makeEMF(canvas); XML_COUNT = count;
     const img = document.createElement("img"); img.className = "thumb"; img.src = canvas.toDataURL("image/png");

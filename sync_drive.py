@@ -103,13 +103,12 @@ def emf_bytes(part):
     return bmp + bmp                                  # две копии — формат станка
 
 
-def raspil_dates(offline=False):
-    """name -> последняя дата задания (для поля «Дата» на бирке)."""
+def raspil_info(offline=False):
+    """name -> {date, qty} из РАСПИЛ: дата задания и кол-во в партии (Д1, столбец E)."""
     m = {}
     try:
         for j in G.parse_job(date_filter="all", offline=offline):
-            prev = m.get(j["name"])
-            m[j["name"]] = j["date"]                  # parse_job идёт по порядку; берём последнюю
+            m[j["name"]] = {"date": j["date"], "qty": j["qty"]}   # берём последнюю запись
     except Exception as e:
         print("  (РАСПИЛ недоступен: %s)" % e)
     return m
@@ -123,7 +122,7 @@ def main():
     svc = drive_service()
     base = G.fetch_base()                             # детали из Details List
     base_norm = {k.replace("/", "-"): v for k, v in base.items()}
-    dates = raspil_dates()
+    info = raspil_info()                              # дата + кол-во в партии (Д1) по детали
     today = datetime.date.today().strftime("%d.%m.%Y")
 
     days = int(os.environ.get("SYNC_DAYS") or "7")    # берём только свежие раскрои
@@ -146,9 +145,12 @@ def main():
         if part is None:
             print("  ? деталь не найдена в базе: %r (папка %s)" % (pname, folder)); missing += 1; continue
 
-        date = dates.get(part["name"]) or today
-        data = emf_bytes(dict(part, date=date, qty=str(n)))
+        ri = info.get(part["name"], {})
+        date = ri.get("date") or today
+        qty_label = ri.get("qty") or n                # кол-во НА БИРКЕ — из РАСПИЛ (Д1), иначе из XML
+        data = emf_bytes(dict(part, date=date, qty=str(qty_label)))
         digest = hashlib.md5(data).hexdigest()
+        # число ФАЙЛОВ остаётся n (из XML) — см. цикл ниже
 
         try:
             sub = get_or_create_subfolder(svc, LABELS_FOLDER_ID, folder)
@@ -182,7 +184,8 @@ def main():
                 if re.match(r"label\d+\.emf$", nm):
                     for f in fs:
                         trash(f["id"])
-            print("  ✓ %s: %d бирок (Место %s, %s)" % (folder, n, part["cell"] or "—", date))
+            print("  ✓ %s: %d файлов, кол-во на бирке %s (Место %s, %s)"
+                  % (folder, n, qty_label, part["cell"] or "—", date))
             made += 1
         except Exception as e:
             print("  ! %s — ошибка записи: %s" % (folder, str(e)[:160])); errors += 1
