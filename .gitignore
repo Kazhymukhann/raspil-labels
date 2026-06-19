@@ -16,3 +16,7 @@ config.json
 # локальные инструменты
 .claude/
 server.js
+
+# OAuth ключи (НЕ публиковать)
+drive-auto/client_secret.json
+*.client_secret.json
