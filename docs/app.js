@@ -109,7 +109,9 @@ function parseJob(rows, dateFilter) {
   const h = rows[0];
   const dateI = Math.max(0, h.indexOf("Дата"));            // колонка A
   const nameI = h.indexOf("Наименование") >= 0 ? h.indexOf("Наименование") : 1; // B
-  const qtyI = h.indexOf("кол-во") >= 0 ? h.indexOf("кол-во") : 2;              // C
+  const qtyI = h.indexOf("кол-во") >= 0 ? h.indexOf("кол-во") : 2;              // C (запас)
+  const d1I = h.indexOf("Д1");                             // E: «Имя-Nшт | ячейки»
+  const reSht = /-\s*(\d+)\s*шт/;
   const want = dateFilter && dateFilter !== "all" ? normDate(dateFilter) : null;
   const order = [], acc = {};
   for (let k = 1; k < rows.length; k++) {
@@ -117,7 +119,10 @@ function parseJob(rows, dateFilter) {
     const rdate = (r[dateI] || "").trim(); if (!rdate) continue;
     if (want && normDate(rdate) !== want) continue;
     const name = (r[nameI] || "").trim(); if (!name) continue;
-    const qty = parseInt(String(r[qtyI] || "").replace(/[^\d]/g, ""), 10) || 0;
+    // кол-во в партии — число Nшт из Д1 (столбец E); запасной вариант — «кол-во» (C)
+    const m = d1I >= 0 && r[d1I] ? String(r[d1I]).match(reSht) : null;
+    const qty = m ? parseInt(m[1], 10)
+                  : (parseInt(String(r[qtyI] || "").replace(/[^\d]/g, ""), 10) || 0);
     const key = name + "|" + rdate;
     if (!(key in acc)) { acc[key] = { name, qty: 0, date: rdate }; order.push(key); }
     acc[key].qty += qty;                                   // суммируем, если деталь в нескольких строках за день

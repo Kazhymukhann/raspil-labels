@@ -148,7 +148,9 @@ def parse_job(date_filter=None, offline=False):
     header = rows[0]
     date_i = header.index("Дата") if "Дата" in header else 0           # A
     name_i = header.index("Наименование") if "Наименование" in header else 1  # B
-    qty_i = header.index("кол-во") if "кол-во" in header else 2         # C
+    qty_i = header.index("кол-во") if "кол-во" in header else 2         # C (запас)
+    d1_i = header.index("Д1") if "Д1" in header else -1                 # E: «Имя-Nшт | ...»
+    sht = re.compile(r"-\s*(\d+)\s*шт", re.U)
     want = norm_date(date_filter) if date_filter and date_filter != "all" else None
 
     order, acc = [], {}
@@ -163,8 +165,13 @@ def parse_job(date_filter=None, offline=False):
         name = r[name_i].strip()
         if not name:
             continue
-        digits = re.sub(r"[^\d]", "", r[qty_i]) if qty_i < len(r) else ""
-        qty = int(digits) if digits else 0
+        # кол-во в партии — Nшт из Д1 (столбец E); запас — «кол-во» (C)
+        m = sht.search(r[d1_i]) if 0 <= d1_i < len(r) else None
+        if m:
+            qty = int(m.group(1))
+        else:
+            digits = re.sub(r"[^\d]", "", r[qty_i]) if qty_i < len(r) else ""
+            qty = int(digits) if digits else 0
         key = (name, rdate)
         if key not in acc:
             acc[key] = {"name": name, "qty": 0, "date": rdate}
