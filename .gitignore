@@ -10,10 +10,12 @@ raspil_cache.csv
 
 # сгенерированные бирки
 labels/*.emf
+Cutting для ФРЦ/
 
 # локальные логи синхронизации
 sync-all.log
 sync-all.pid
+sync-local.log
 
 # системное
 .DS_Store
