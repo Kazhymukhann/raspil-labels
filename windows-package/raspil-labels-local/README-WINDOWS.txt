@@ -3,19 +3,26 @@ PackSmart / raspil labels - local Windows package
 Что внутри:
 - Cutting для ФРЦ\*.xml          исходные XML раскроя
 - Cutting для ФРЦ\labels\        сюда генерируются папки labels и labelN.emf
+- START-HERE.bat                 одна кнопка: установка + запуск автообновления
 - install.bat                    установить Python-зависимости
 - sync-once.bat                  один раз сгенерировать/обновить labels
 - sync-every-minute.bat          автоматически обновлять labels каждую минуту
 
-Первый запуск на Windows:
-1. Установить Python 3.10+ с python.org, если его нет.
-   В установщике включить галочку "Add Python to PATH".
-2. Открыть install.bat.
-3. Открыть sync-once.bat.
+Самый простой запуск:
+1. Распаковать zip в обычную папку, например Desktop или C:\raspil-labels.
+2. Открыть START-HERE.bat.
+3. Держать окно открытым.
+
+START-HERE.bat сам:
+- найдёт Python;
+- если Python нет, попробует поставить Python 3.12 через winget;
+- установит нужные библиотеки;
+- создаст папку Cutting для ФРЦ, если её нет;
+- будет обновлять labels каждую минуту.
 
 Постоянная работа:
 1. Класть новые XML в папку "Cutting для ФРЦ".
-2. Запустить sync-every-minute.bat и держать окно открытым.
+2. Запустить START-HERE.bat и держать окно открытым.
 3. Готовые бирки будут здесь:
    Cutting для ФРЦ\labels\<имя детали>\label1.emf, label2.emf, ...
 
