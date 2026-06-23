@@ -159,6 +159,21 @@ def row_for_xml_folder(job_rows, pname):
     return found_main or found_ref
 
 
+def build_job_row_index(job_rows):
+    """Быстрый индекс строк РАСПИЛ: имя детали -> главная строка / дочерняя строка."""
+    main, ref = {}, {}
+    for row in job_rows:
+        main[G.compact_part_name(row.get("name", ""))] = row
+        for item in row.get("refs", []):
+            ref[G.compact_part_name(item.get("name", ""))] = row
+    return {"main": main, "ref": ref}
+
+
+def row_for_xml_folder_indexed(job_index, pname):
+    key = G.compact_part_name(pname)
+    return job_index.get("main", {}).get(key) or job_index.get("ref", {}).get(key)
+
+
 def assign_labels(label_job, fallback_part, job_row, base_norm, today):
     """labelN -> данные конкретной детали внутри XML-папки.
 

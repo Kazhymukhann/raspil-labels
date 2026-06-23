@@ -16,6 +16,8 @@ Cutting для ФРЦ/
 sync-all.log
 sync-all.pid
 sync-local.log
+.sync_state.json
+.sync_state.tmp
 
 # системное
 .DS_Store

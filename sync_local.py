@@ -10,6 +10,7 @@
 
 import datetime
 import hashlib
+import json
 import os
 import re
 from pathlib import Path
@@ -21,6 +22,8 @@ import sync_drive as D
 HERE = Path(__file__).resolve().parent
 XML_DIR = Path(os.environ.get("LOCAL_XML_DIR") or HERE / "Cutting для ФРЦ")
 LABELS_DIR = Path(os.environ.get("LOCAL_LABELS_DIR") or XML_DIR / "labels")
+STATE_PATH = Path(os.environ.get("LOCAL_STATE_FILE") or HERE / ".sync_state.json")
+STATE_VERSION = 3
 
 
 def file_md5(path):
@@ -46,6 +49,63 @@ def trash_extra_labels(folder, keep_count):
             p.unlink()
 
 
+def load_state():
+    try:
+        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        if state.get("version") == STATE_VERSION:
+            return state
+    except Exception:
+        pass
+    return {"version": STATE_VERSION, "xml": {}}
+
+
+def save_state(state):
+    tmp = STATE_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+    tmp.replace(STATE_PATH)
+
+
+def xml_stat(path):
+    st = path.stat()
+    return {"size": st.st_size, "mtime_ns": st.st_mtime_ns}
+
+
+def stable_hash(obj):
+    raw = json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def part_sig(part):
+    keys = ("name", "material", "cell", "prisadka", "length", "width",
+            "thick", "tolk", "dk", "shk")
+    return {k: str(part.get(k, "") if part else "") for k in keys}
+
+
+def row_sig(row):
+    if not row:
+        return None
+    return {
+        "date": row.get("date", ""),
+        "name": row.get("name", ""),
+        "refs": [{"name": ref.get("name", ""), "qty": ref.get("qty")}
+                 for ref in row.get("refs", [])],
+    }
+
+
+def assignment_sig(label_job, assigned, job_row):
+    return stable_hash({
+        "xml": label_job,
+        "row": row_sig(job_row),
+        "assigned": [{
+            "num": item["num"],
+            "qty": item["qty"],
+            "date": item["date"],
+            "source": item["source"],
+            "part": part_sig(item["part"]),
+        } for item in assigned],
+    })
+
+
 def main():
     if not XML_DIR.exists():
         XML_DIR.mkdir(parents=True, exist_ok=True)
@@ -60,14 +120,24 @@ def main():
     base = G.fetch_base()
     base_norm = G.build_part_lookup(base)
     job_rows = G.parse_job_rows(date_filter="all")
+    job_index = D.build_job_row_index(job_rows)
     today = datetime.date.today().strftime("%d.%m.%Y")
+    state = load_state()
+    state_xml = state.setdefault("xml", {})
 
-    made = skipped = missing = qty_from_xml = errors = 0
+    made = skipped = cached = missing = qty_from_xml = errors = 0
     total = len(xmls)
     for pos, xml_path in enumerate(xmls, 1):
         prefix = "[%d/%d] " % (pos, total)
+        rel_key = str(xml_path.relative_to(XML_DIR))
+        stat = xml_stat(xml_path)
+        cached_xml = state_xml.get(rel_key, {})
+        xml_changed = cached_xml.get("stat") != stat
         try:
-            label_jobs = D.parse_xml_bytes(xml_path.read_bytes())
+            if not xml_changed and cached_xml.get("label_jobs"):
+                label_jobs = cached_xml["label_jobs"]
+            else:
+                label_jobs = D.parse_xml_bytes(xml_path.read_bytes())
         except Exception as e:
             print("  %s! %s — ошибка чтения XML: %s" % (prefix, xml_path.name, e))
             errors += 1
@@ -86,10 +156,17 @@ def main():
                 missing += 1
                 continue
 
-            job_row = D.row_for_xml_folder(job_rows, pname)
+            job_row = D.row_for_xml_folder_indexed(job_index, pname)
             assigned = D.assign_labels(label_job, part, job_row, base_norm, today)
             if any(item["source"] == "XML" for item in assigned):
                 qty_from_xml += 1
+
+            sig = assignment_sig(label_job, assigned, job_row)
+            job_key = folder_name
+            prev_jobs = cached_xml.get("jobs", {}) if isinstance(cached_xml.get("jobs"), dict) else {}
+            if not xml_changed and prev_jobs.get(job_key) == sig:
+                cached += 1
+                continue
 
             out_dir = LABELS_DIR / folder_name
             changed = 0
@@ -107,8 +184,20 @@ def main():
                 print("  %s= %s: без изменений (%d файлов)" % (subprefix, folder_name, n))
                 skipped += 1
 
-    print("Готово. Обновлено: %d, без изменений: %d, нет в базе: %d, кол-во взято из XML: %d, ошибок: %d"
-          % (made, skipped, missing, qty_from_xml, errors))
+            cached_xml.setdefault("jobs", {})[job_key] = sig
+
+        cached_xml["stat"] = stat
+        cached_xml["label_jobs"] = label_jobs
+        state_xml[rel_key] = cached_xml
+
+    known = set(str(p.relative_to(XML_DIR)) for p in xmls)
+    for key in list(state_xml):
+        if key not in known:
+            state_xml.pop(key, None)
+    save_state(state)
+
+    print("Готово. Обновлено: %d, без изменений: %d, пропущено по кэшу: %d, нет в базе: %d, кол-во взято из XML: %d, ошибок: %d"
+          % (made, skipped, cached, missing, qty_from_xml, errors))
 
 
 if __name__ == "__main__":
