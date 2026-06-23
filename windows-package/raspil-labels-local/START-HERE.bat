@@ -16,15 +16,11 @@ if not defined PYTHON (
     where winget >nul 2>&1
     if errorlevel 1 (
         echo.
-        echo winget was not found, so Python cannot be installed automatically.
-        echo The Python download page will open now.
-        echo Install Python 3.10+ and enable "Add python.exe to PATH".
-        echo Then run START-HERE.bat again.
-        start https://www.python.org/downloads/windows/
-        pause
-        exit /b 1
+        echo winget was not found. Trying direct download from python.org...
+        call :download_python
+    ) else (
+        winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
     )
-    winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
     call :find_python
 )
 
@@ -92,3 +88,24 @@ if exist "%ProgramFiles%\Python312\python.exe" (
     exit /b 0
 )
 exit /b 0
+
+:download_python
+set "PYTHON_INSTALLER=%TEMP%\python-3.12.10-amd64.exe"
+set "PYTHON_URL=https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe"
+echo Downloading Python installer...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%PYTHON_URL%' -OutFile '%PYTHON_INSTALLER%'"
+if errorlevel 1 goto :download_failed
+echo Installing Python for this Windows user...
+"%PYTHON_INSTALLER%" /quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Include_launcher=1
+if errorlevel 1 goto :download_failed
+exit /b 0
+
+:download_failed
+echo.
+echo Automatic Python download/install failed.
+echo The Python download page will open now.
+echo Click "Download Windows installer (64-bit)", install Python,
+echo enable "Add python.exe to PATH", then run START-HERE.bat again.
+start https://www.python.org/downloads/windows/
+pause
+exit /b 1
