@@ -13,6 +13,8 @@ import hashlib
 import json
 import os
 import re
+import sys
+import time
 from pathlib import Path
 
 import generate_labels as G
@@ -24,6 +26,8 @@ XML_DIR = Path(os.environ.get("LOCAL_XML_DIR") or HERE / "Cutting для ФРЦ"
 LABELS_DIR = Path(os.environ.get("LOCAL_LABELS_DIR") or XML_DIR / "labels")
 STATE_PATH = Path(os.environ.get("LOCAL_STATE_FILE") or HERE / ".sync_state.json")
 STATE_VERSION = 3
+WATCH_INTERVAL = int(os.environ.get("LOCAL_WATCH_INTERVAL") or "5")
+TABLE_INTERVAL = int(os.environ.get("LOCAL_TABLE_INTERVAL") or "60")
 
 
 def file_md5(path):
@@ -106,13 +110,28 @@ def assignment_sig(label_job, assigned, job_row):
     })
 
 
-def main():
+def xml_dir_signature():
+    if not XML_DIR.exists():
+        return ()
+    out = []
+    for path in XML_DIR.glob("*.xml"):
+        try:
+            st = path.stat()
+        except OSError:
+            continue
+        out.append((path.name, st.st_size, st.st_mtime_ns))
+    return tuple(sorted(out))
+
+
+def run_once(reason="manual"):
     if not XML_DIR.exists():
         XML_DIR.mkdir(parents=True, exist_ok=True)
         print("XML folder created: %s" % XML_DIR)
         print("Put XML files there and run sync again.")
 
     xmls = sorted(XML_DIR.glob("*.xml"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if reason:
+        print("Причина запуска: %s" % reason)
     print("Локальные XML: %d" % len(xmls))
     print("XML: %s" % XML_DIR)
     print("labels: %s" % LABELS_DIR)
@@ -198,6 +217,41 @@ def main():
 
     print("Готово. Обновлено: %d, без изменений: %d, пропущено по кэшу: %d, нет в базе: %d, кол-во взято из XML: %d, ошибок: %d"
           % (made, skipped, cached, missing, qty_from_xml, errors))
+
+
+def watch_loop():
+    print("Watch mode: XML folder is checked every %d sec; tables every %d sec."
+          % (WATCH_INTERVAL, TABLE_INTERVAL))
+    last_sig = None
+    last_table_run = 0
+    while True:
+        now = time.time()
+        sig = xml_dir_signature()
+        should_run = False
+        reason = ""
+        if sig != last_sig:
+            should_run = True
+            reason = "XML folder changed"
+            last_sig = sig
+        elif now - last_table_run >= TABLE_INTERVAL:
+            should_run = True
+            reason = "scheduled table check"
+
+        if should_run:
+            print("-" * 60)
+            print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            run_once(reason)
+            last_table_run = time.time()
+            last_sig = xml_dir_signature()
+
+        time.sleep(WATCH_INTERVAL)
+
+
+def main():
+    if "--watch" in sys.argv:
+        watch_loop()
+    else:
+        run_once()
 
 
 if __name__ == "__main__":

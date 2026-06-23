@@ -41,7 +41,7 @@ if errorlevel 1 goto :pip_error
 if errorlevel 1 goto :pip_error
 
 echo.
-echo Ready. The program will update labels every 60 seconds.
+echo Ready. The program will watch XML changes and update labels automatically.
 echo.
 echo Put XML files into the Cutting folder inside this package.
 echo.
@@ -51,14 +51,8 @@ echo Keep this window open on the machine computer.
 echo To stop syncing, close this window.
 echo.
 
-:loop
-echo ------------------------------------------------------------
-echo %DATE% %TIME%
-%PYTHON% sync_local.py
-echo.
-echo Waiting 60 seconds...
-timeout /t 60 /nobreak >nul
-goto loop
+%PYTHON% sync_local.py --watch
+pause
 
 :pip_error
 echo.
