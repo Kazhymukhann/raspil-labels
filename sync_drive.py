@@ -185,11 +185,34 @@ def assign_labels(label_job, fallback_part, job_row, base_norm, today):
         for ref in job_row.get("refs", []):
             part = G.find_part(base_norm, ref["name"])
             if part:
+                part = dict(part)
+                if ref.get("cell"):
+                    part["cell"] = ref["cell"]
                 candidates.append({
                     "ref": ref,
                     "part": part,
                     "dim": dim_key(part.get("length"), part.get("width")),
                 })
+
+    labels_by_dim = {}
+    for label in label_job.get("labels") or []:
+        ldim = dim_key(*(label.get("dims") or (None, None)))
+        labels_by_dim.setdefault(ldim, []).append(label)
+
+    candidate_by_dim = {}
+    for candidate in candidates:
+        if candidate["dim"]:
+            candidate_by_dim.setdefault(candidate["dim"], []).append(candidate)
+
+    fallback_matches = {}
+    for ldim, labels in labels_by_dim.items():
+        if not ldim or ldim in candidate_by_dim:
+            continue
+        qty_matches = [c for c in candidates
+                       if c["ref"].get("qty") == len(labels)
+                       and c["ref"].get("name") != fallback_part.get("name")]
+        if len(qty_matches) == 1:
+            fallback_matches[ldim] = qty_matches[0]
 
     assigned = []
     for label in label_job.get("labels") or []:
@@ -200,6 +223,8 @@ def assign_labels(label_job, fallback_part, job_row, base_norm, today):
                 if candidate["dim"] == ldim:
                     chosen = candidate
                     break
+            if chosen is None:
+                chosen = fallback_matches.get(ldim)
         if chosen:
             qty = chosen["ref"].get("qty")
             source = "РАСПИЛ"

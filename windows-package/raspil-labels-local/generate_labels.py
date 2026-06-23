@@ -214,11 +214,13 @@ def parse_xml(path):
 
 
 def parse_label_ref(text):
-    """Строка Д1/Д2/... вида «Имя-12шт | A1» -> {name, qty}."""
-    m = re.match(r"\s*(.+?)\s*-\s*(\d+)\s*шт\b", str(text or ""), re.U | re.I)
+    """Строка Д1/Д2/... вида «Имя-12шт | A1» -> {name, qty, cell}."""
+    m = re.match(r"\s*(.+?)\s*-\s*(\d+)\s*шт\b(?:\s*\|\s*(.+?)\s*)?$",
+                 str(text or ""), re.U | re.I)
     if not m:
         return None
-    return {"name": m.group(1).strip(), "qty": int(m.group(2))}
+    return {"name": m.group(1).strip(), "qty": int(m.group(2)),
+            "cell": (m.group(3) or "").strip()}
 
 
 def norm_date(s):
