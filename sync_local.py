@@ -48,8 +48,9 @@ def trash_extra_labels(folder, keep_count):
 
 def main():
     if not XML_DIR.exists():
-        print("Папка XML не найдена: %s" % XML_DIR)
-        return
+        XML_DIR.mkdir(parents=True, exist_ok=True)
+        print("XML folder created: %s" % XML_DIR)
+        print("Put XML files there and run sync again.")
 
     xmls = sorted(XML_DIR.glob("*.xml"), key=lambda p: p.stat().st_mtime, reverse=True)
     print("Локальные XML: %d" % len(xmls))

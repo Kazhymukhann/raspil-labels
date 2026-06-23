@@ -12,14 +12,14 @@ echo.
 
 call :find_python
 if not defined PYTHON (
-    echo Python не найден. Пробую установить Python 3.12 через winget...
+    echo Python was not found. Trying to install Python 3.12 with winget...
     where winget >nul 2>&1
     if errorlevel 1 (
         echo.
-        echo На этом Windows нет winget, поэтому автоматическая установка Python невозможна.
-        echo Открой страницу https://www.python.org/downloads/windows/
-        echo Установи Python 3.10+ и включи галочку "Add python.exe to PATH".
-        echo Потом снова открой этот файл START-HERE.bat.
+        echo winget was not found, so Python cannot be installed automatically.
+        echo The Python download page will open now.
+        echo Install Python 3.10+ and enable "Add python.exe to PATH".
+        echo Then run START-HERE.bat again.
         start https://www.python.org/downloads/windows/
         pause
         exit /b 1
@@ -30,33 +30,29 @@ if not defined PYTHON (
 
 if not defined PYTHON (
     echo.
-    echo Python всё ещё не найден. Закрой это окно и открой START-HERE.bat ещё раз.
+    echo Python is still not available. Close this window and run START-HERE.bat again.
     pause
     exit /b 1
 )
 
 echo Python: %PYTHON%
 echo.
-echo Устанавливаю/обновляю библиотеки...
+echo Installing/updating Python packages...
 %PYTHON% -m ensurepip --upgrade >nul 2>&1
 %PYTHON% -m pip install --disable-pip-version-check --upgrade pip
 if errorlevel 1 goto :pip_error
 %PYTHON% -m pip install --disable-pip-version-check -r requirements.txt
 if errorlevel 1 goto :pip_error
 
-if not exist "Cutting для ФРЦ" mkdir "Cutting для ФРЦ"
-
 echo.
-echo Готово. Теперь программа будет обновлять labels каждую минуту.
+echo Ready. The program will update labels every 60 seconds.
 echo.
-echo XML класть сюда:
-echo %CD%\Cutting для ФРЦ
+echo Put XML files into the Cutting folder inside this package.
 echo.
-echo Готовые бирки будут здесь:
-echo %CD%\Cutting для ФРЦ\labels
+echo Labels will be generated in the labels folder inside that Cutting folder.
 echo.
-echo Окно можно держать открытым на компьютере станка.
-echo Чтобы остановить - закрыть окно.
+echo Keep this window open on the machine computer.
+echo To stop syncing, close this window.
 echo.
 
 :loop
@@ -64,14 +60,14 @@ echo ------------------------------------------------------------
 echo %DATE% %TIME%
 %PYTHON% sync_local.py
 echo.
-echo Жду 60 секунд...
+echo Waiting 60 seconds...
 timeout /t 60 /nobreak >nul
 goto loop
 
 :pip_error
 echo.
-echo Не получилось установить библиотеки.
-echo Проверь интернет и попробуй открыть START-HERE.bat ещё раз.
+echo Python package installation failed.
+echo Check the internet connection and run START-HERE.bat again.
 pause
 exit /b 1
 

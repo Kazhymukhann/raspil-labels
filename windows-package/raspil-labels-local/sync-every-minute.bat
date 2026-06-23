@@ -8,7 +8,7 @@ if errorlevel 1 set "PYTHON=python"
 
 echo Local label sync is running every 60 seconds.
 echo Keep this window open.
-echo Labels folder: %CD%\Cutting для ФРЦ\labels
+echo Labels folder: labels inside the Cutting folder
 echo.
 
 :loop

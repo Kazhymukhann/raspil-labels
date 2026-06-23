@@ -11,5 +11,5 @@ echo Running one local sync...
 
 echo.
 echo Done. Labels are in:
-echo %CD%\Cutting для ФРЦ\labels
+echo the labels folder inside the Cutting folder
 pause
