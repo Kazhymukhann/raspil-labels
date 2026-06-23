@@ -80,7 +80,7 @@ def main():
             subprefix = prefix if len(label_jobs) == 1 else prefix + "[%d/%d] " % (job_pos, len(label_jobs))
             folder_name, n, material = label_job["folder"], label_job["count"], label_job["material"]
             pname = folder_name[:-(len(material) + 1)] if material and folder_name.endswith("-" + material) else folder_name
-            part = base_norm.get(G.norm_part_name(pname))
+            part = G.find_part(base_norm, pname, material)
             if part is None:
                 print("  %s? деталь не найдена в базе: %r (папка %s)" % (subprefix, pname, folder_name))
                 missing += 1

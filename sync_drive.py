@@ -168,7 +168,7 @@ def assign_labels(label_job, fallback_part, job_row, base_norm, today):
     candidates = []
     if job_row:
         for ref in job_row.get("refs", []):
-            part = base_norm.get(G.norm_part_name(ref["name"]))
+            part = G.find_part(base_norm, ref["name"])
             if part:
                 candidates.append({
                     "ref": ref,
@@ -264,7 +264,7 @@ def main():
             subprefix = prefix if len(label_jobs) == 1 else prefix + "[%d/%d] " % (job_pos, len(label_jobs))
             folder, n, material = label_job["folder"], label_job["count"], label_job["material"]
             pname = folder[:-(len(material) + 1)] if material and folder.endswith("-" + material) else folder
-            part = base_norm.get(G.norm_part_name(pname))
+            part = G.find_part(base_norm, pname, material)
             if part is None:
                 print("  %s? деталь не найдена в базе: %r (папка %s)" % (subprefix, pname, folder)); missing += 1; continue
 

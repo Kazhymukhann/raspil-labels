@@ -53,9 +53,40 @@ def norm_part_name(name):
     s = re.sub(r"\s+", " ", s)
     return s.casefold()
 
+def compact_part_name(name):
+    """Более терпимый ключ: L-R/L_R/L R и GYF2110/GYF 2110 считаем одним именем."""
+    s = norm_part_name(name).replace("_", "-")
+    return re.sub(r"[\s\-_/«»]+", "", s)
+
+def part_lookup_keys(name):
+    return [norm_part_name(name), compact_part_name(name)]
+
 def build_part_lookup(base):
     """Нормализованный lookup: имя детали -> поля BASE."""
-    return {norm_part_name(k): v for k, v in base.items()}
+    out = {}
+    for k, v in base.items():
+        for key in part_lookup_keys(k):
+            out.setdefault(key, v)
+    return out
+
+def find_part(base_lookup, name, material=""):
+    """Найти деталь в BASE с учётом безопасных вариантов написания."""
+    variants = [str(name or "").strip()]
+    mat = str(material or "").casefold()
+    if "вотан" in mat:
+        variants += [variants[0] + " Вотан", variants[0] + " Votan"]
+    # BAZIS иногда добавляет к столешницам материал в имя папки:
+    # ST-3000 Votan-Столешница _Дуб Вотан_ -> ST-3000 Votan
+    cleaned = re.sub(r"\s*-?\s*столешница.*$", "", variants[0], flags=re.I)
+    if cleaned != variants[0]:
+        variants.append(cleaned)
+
+    for variant in variants:
+        for key in part_lookup_keys(variant):
+            part = base_lookup.get(key)
+            if part:
+                return part
+    return None
 
 def load_sheet_id():
     """ID Google-таблицы. Берётся из env RASPIL_SHEET_ID или из config.json
@@ -444,7 +475,7 @@ def main():
             print("  ! В XML не найдены бирки (label-коды)"); sys.exit(1)
         pname = folder[:-(len(material) + 1)] if material and folder.endswith("-" + material) else folder
         base_norm = build_part_lookup(base)
-        part = base_norm.get(norm_part_name(pname))
+        part = find_part(base_norm, pname, material)
         if part is None:
             print("  ! Деталь не найдена в базе: %r (папка %r)" % (pname, folder)); sys.exit(1)
         outdir = os.path.join(OUT_DIR, folder)
@@ -490,7 +521,7 @@ def main():
     # ---- генерим бирки ----
     n = 0
     for name, qty, date in jobs:
-        part = base.get(name) or base_lookup.get(norm_part_name(name))
+        part = base.get(name) or find_part(base_lookup, name)
         if part is None:
             print("  ! НЕ найдено в BASE: %r — пропуск" % name)
             continue
